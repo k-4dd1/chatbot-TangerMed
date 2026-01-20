@@ -1,0 +1,206 @@
+"use client";
+
+import React from "react";
+import { createPortal } from "react-dom";
+import { motion, AnimatePresence } from "framer-motion";
+import { Menu, Bot, User, LogOut } from "lucide-react";
+import { Button } from "../ui/Button";
+import { cn } from "../../lib/utils";
+import Image from 'next/image'
+
+export function ChatHeader({
+  sidebarOpen,
+  setSidebarOpen,
+  user,
+  isDarkMode,
+  localShowDropdown,
+  dropdownPosition,
+  dropdownButtonRef,
+  handleToggleDropdown,
+  handleCloseDropdown,
+  goToProfile,
+  handleLogout
+}) {
+  return (
+    <>
+      {/* Chat Header */}
+      <div className={cn(
+        "flex items-center justify-between bg-blue-950 pl-6 pr-6 pt-3 pb-3 border-b border-gray-200 backdrop-blur-sm",
+        isDarkMode 
+          ? "border-slate-700 bg-slate-900/80" 
+          : "border-border bg-background/80"
+      )}>
+        <div className="flex items-center space-x-4">
+          {!sidebarOpen && (
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              onClick={() => setSidebarOpen(true)} 
+              className={cn(
+                isDarkMode ? "hover:bg-slate-800" : "hover:bg-accent/10"
+              )}
+            >
+              <Menu className="h-4 w-4" />
+            </Button>
+          )}
+          <div className="flex items-center space-x-3">
+            
+            <div 
+              className="w-32 rounded-xl flex items-center justify-center shadow-sm"
+            >
+              <Image 
+                src="assets/tmsa.svg" 
+                alt="logo" 
+                width={32}
+                height={32}
+                className="w-32 "
+              />
+            </div>
+            <div>
+              <h2 className={cn(
+                "font-semibold",
+                isDarkMode ? "text-slate-100" : "text-white"
+              )}>
+                
+              </h2>
+              <p className={cn(
+                "text-xs text-right",
+                isDarkMode ? "text-slate-400" : "text-white"
+              )}>
+              </p>
+            </div>
+          </div>
+        </div>
+        
+        {/* User dropdown trigger */}
+        <div className="relative">
+          <button
+            ref={dropdownButtonRef}
+            onClick={(e) => {
+              console.log('Button clicked!', e);
+              handleToggleDropdown(e);
+            }}
+            className={cn(
+              "flex items-center space-x-3 px-3 py-2 rounded-xl  transition-all duration-200 cursor-pointer hover:scale-105",
+              isDarkMode 
+                ? "bg-slate-800 border-slate-700 hover:bg-slate-700" 
+                : ""
+            )}
+            style={{ zIndex: 1 }}
+            type="button"
+          >
+            <div className={cn(
+              "w-8 h-8 rounded-full flex items-center justify-center",
+              isDarkMode ? "bg-slate-700" : "bg-accent/20"
+            )}>
+              <User className={cn(
+                "h-4 w-4 ",
+                isDarkMode ? "text-slate-300" : "text-white"
+              )} />
+            </div>
+            <span className={cn(
+              "text-sm font-medium",
+              isDarkMode ? "text-slate-100" : "text-white"
+            )}>
+              {user?.username || 'Utilisateur'}
+            </span>
+          </button>
+
+          {localShowDropdown && typeof window !== 'undefined' && createPortal(
+            <div
+              className={cn(
+                "fixed rounded-lg shadow-lg py-1 w-44 border backdrop-blur-sm",
+                isDarkMode
+                  ? 'bg-slate-800/95 border-slate-700/50 shadow-xl shadow-slate-900/50'
+                  : 'bg-white/95 border-slate-200/50 shadow-xl shadow-slate-900/10'
+              )}
+              style={{
+                zIndex: 99999,
+                position: 'fixed',
+                top: `${dropdownPosition.top}px`,
+                left: `${dropdownPosition.left}px`,
+                visibility: 'visible',
+                pointerEvents: 'auto',
+                transform: 'none'
+              }}
+            >
+              <div className="p-1">
+                <button
+                  onMouseDown={(e) => {
+                    e.stopPropagation();
+                    console.log('Profile button mouse down!');
+                    console.log('goToProfile function:', goToProfile);
+                    
+                    if (goToProfile) {
+                      console.log('Navigating to profile...');
+                      goToProfile();
+                    } else {
+                      console.error('goToProfile function is not available!');
+                    }
+                  }}
+                  className={cn(
+                    "w-full px-3 py-2 text-left flex items-center space-x-3 rounded-lg transition-all duration-200 text-sm",
+                    isDarkMode
+                      ? 'hover:bg-slate-700/70 text-slate-200 hover:text-white'
+                      : 'text-slate-700 hover:text-slate-900'
+                  )}
+                >
+                  <User className="w-4 h-4" />
+                  <span>Profile</span>
+                </button>
+                
+                <div className={cn(
+                  "my-1 h-px",
+                  isDarkMode ? 'bg-slate-700/50' : 'bg-slate-200/50'
+                )}></div>
+                
+                <button
+                  onMouseDown={(e) => {
+                    e.stopPropagation();
+                    console.log('Logout button mouse down!');
+                    console.log('handleLogout function:', handleLogout);
+                    
+                    if (handleLogout) {
+                      console.log('Logging out...');
+                      handleLogout();
+                    } else {
+                      console.error('handleLogout function is not available!');
+                    }
+                  }}
+                  className={cn(
+                    "w-full px-3 py-2 text-left flex items-center space-x-3 rounded-lg transition-all duration-200 text-sm",
+                    isDarkMode
+                      ? 'hover:bg-red-500/20 text-red-400 hover:text-red-300'
+                      : ' text-red-600 hover:text-red-700'
+                  )}
+                >
+                  <LogOut className="w-4 h-4" />
+                  <span>Déconnexion</span>
+                </button>
+              </div>
+              </div>,
+              document.body
+            )}
+        </div>
+      </div>
+
+      {/* Overlay for dropdown */}
+      <AnimatePresence>
+        {localShowDropdown && typeof window !== 'undefined' && createPortal(
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0"
+            onClick={handleCloseDropdown}
+            style={{ 
+              pointerEvents: localShowDropdown ? 'auto' : 'none',
+              zIndex: 99998
+            }}
+          />,
+          document.body
+        )}
+      </AnimatePresence>
+    </>
+  );
+} 

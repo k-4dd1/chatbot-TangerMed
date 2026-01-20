@@ -1,0 +1,437 @@
+'use client';
+
+import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useRouter } from 'next/navigation';
+import apiService from '../services/api';
+import authService from '../services/authService';
+import { MessageUtils } from '../lib/utils/messageUtils';
+import { useConversationsContext } from '../contexts/ConversationsContext';
+
+export const useDashboard = (searchParams) => {
+  // Get shared state from context
+  const {
+    conversations,
+    createNewConversation,
+    deleteConversation,
+    updateConversationTimestamp,
+    updateConversationTitle,
+    addMessage,
+    getConversationById,
+    loadConversations
+  } = useConversationsContext();
+  // console.log('conversations inside useDashboard', conversations.length);
+  // Local dashboard-specific state
+  const [messages, setMessages] = useState([]);
+  const [inputMessage, setInputMessage] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+  const [currentConversationId, setCurrentConversationId] = useState(null);
+  const [showDropdown, setShowDropdown] = useState(false);
+  const [user, setUser] = useState(null);
+  const [isLoadingConversation, setIsLoadingConversation] = useState(false);
+  const [isCreatingConversation, setIsCreatingConversation] = useState(false);
+  const [isClearingConversation, setIsClearingConversation] = useState(false);
+  const router = useRouter();
+
+  // Memoize the conversation ID to prevent unnecessary re-renders
+  const conversationIdFromUrl = useMemo(() => {
+    const id = searchParams?.get('conversation');
+    console.log('🔍 URL conversation ID:', id);
+    return id;
+  }, [searchParams]);
+
+  // Load user data on component mount
+  useEffect(() => {
+    const loadUser = async () => {
+      const result = await authService.getCurrentUser();
+      if (result.success) {
+        setUser(result.data);
+      }
+    };
+    loadUser();
+  }, []);
+
+  // Load conversations when dashboard initializes (for authenticated users)
+  useEffect(() => {
+    loadConversations();
+  }, [loadConversations]);
+
+  // Define loadConversation function first
+  const loadConversation = useCallback(async (conversationId) => {
+    console.log('🔄 loadConversation called with ID:', conversationId);
+    try {
+      setIsLoadingConversation(true);
+      setCurrentConversationId(conversationId);
+      
+      // First try to get conversation from context (in-memory state)
+      const contextConversation = getConversationById(conversationId);
+      if (contextConversation && contextConversation.messages && contextConversation.messages.length > 0) {
+        console.log('📦 Found conversation in context state with', contextConversation.messages.length, 'messages');
+        setMessages(contextConversation.messages);
+        return;
+      }
+      
+      // If not found in context or has no messages, try to get messages from API
+      try {
+        console.log('🌐 Fetching conversation messages from API for conversation:', conversationId);
+        const messages = await apiService.getConversationMessages(conversationId);
+        console.log('📨 Raw API response:', messages);
+        
+        if (messages && messages.length > 0) {
+          console.log('📥 Got messages from API:', messages.length);
+          const formattedMessages = messages.map(msg => ({
+            id: msg.id || crypto.randomUUID(),
+            type: msg.type || (msg.role === 'user' || msg.sender === 'user' ? 'user' : 'bot'),
+            content: msg.content,
+            timestamp: msg.timestamp || msg.created_at || new Date().toISOString(),
+            role: msg.role || msg.sender
+          }));
+          console.log('✅ Formatted messages:', formattedMessages);
+          setMessages(formattedMessages);
+          
+          // Update the conversation in context with the messages
+          formattedMessages.forEach(message => {
+            addMessage(conversationId, message);
+          });
+        } else {
+          console.log('📭 No messages found for conversation');
+          setMessages([]);
+        }
+      } catch (apiError) {
+        console.error('❌ Failed to load conversation messages from API:', apiError);
+        // If API fails, check if we have any cached data in context and use it
+        if (contextConversation) {
+          console.log('📦 Using context conversation data as fallback');
+          setMessages(contextConversation.messages || []);
+        } else {
+          console.log('💔 No cached data available, setting empty messages');
+          setMessages([]);
+        }
+      }
+    } catch (error) {
+      console.error('Failed to load conversation:', error);
+      setMessages([]);
+      setCurrentConversationId(null);
+    } finally {
+      setIsLoadingConversation(false);
+    }
+  }, [getConversationById, addMessage]);
+
+  // Load specific conversation from URL parameters
+  useEffect(() => {
+    // Don't load conversation if we're currently creating one or clearing conversation state
+    if (isCreatingConversation) {
+      console.log('🔄 Skipping conversation load because we\'re creating one');
+      return;
+    }
+    
+    if (isClearingConversation) {
+      console.log('🔄 Skipping conversation load because we\'re clearing conversation state');
+      return;
+    }
+    
+    console.log('🔄 URL Effect triggered:', {
+      conversationIdFromUrl,
+      currentConversationId,
+      isCreatingConversation,
+      isClearingConversation,
+      messagesCount: messages.length
+    });
+    
+    if (conversationIdFromUrl && conversationIdFromUrl !== currentConversationId) {
+      console.log('🔄 URL conversation changed from', currentConversationId, 'to', conversationIdFromUrl);
+      
+      // Check if we already have this conversation loaded with messages
+      const existingConversation = getConversationById(conversationIdFromUrl);
+      if (existingConversation && existingConversation.messages && existingConversation.messages.length > 0) {
+        console.log('📦 Conversation already loaded in context with', existingConversation.messages.length, 'messages, using cached data');
+        setCurrentConversationId(conversationIdFromUrl);
+        setMessages(existingConversation.messages);
+        return;
+      } else {
+        console.log('🔍 No cached conversation found or no messages:', {
+          hasConversation: !!existingConversation,
+          hasMessages: existingConversation?.messages?.length || 0
+        });
+      }
+      
+      // Only load from API if we don't have the conversation in context
+      loadConversation(conversationIdFromUrl);
+    } else if (!conversationIdFromUrl && currentConversationId) {
+      // If there's no conversation ID in URL but we have a current conversation, reset state
+      console.log('🔄 No conversation in URL, resetting state');
+      setMessages([]);
+      setCurrentConversationId(null);
+      setIsLoadingConversation(false);
+    }
+  }, [conversationIdFromUrl, currentConversationId, isCreatingConversation, isClearingConversation, loadConversation, getConversationById, messages]);
+
+  // Reset clearing flag when URL actually changes to not have conversation ID
+  useEffect(() => {
+    if (isClearingConversation && !conversationIdFromUrl) {
+      console.log('🔄 URL cleared, resetting clearing flag');
+      setIsClearingConversation(false);
+    }
+  }, [conversationIdFromUrl, isClearingConversation]);
+
+  const sendMessage = useCallback(async (messageContent, useStreaming = true) => {
+    if (!messageContent.trim()) return;
+
+    const userMessage = MessageUtils.createUserMessage(messageContent);
+    let conversationId = currentConversationId;
+    
+    // Create new conversation immediately if none exists - BEFORE adding message to state
+    if (!conversationId) {
+      // Prevent multiple conversation creations
+      if (isCreatingConversation) {
+        console.log('🔄 Already creating conversation, skipping...');
+        return;
+      }
+      
+      try {
+        setIsCreatingConversation(true);
+        
+        // Create conversation using the context function
+        const newConversation = await createNewConversation();
+        
+        conversationId = newConversation.id;
+        
+        // Update state immediately
+        setCurrentConversationId(newConversation.id);
+        
+        // Now add the message to state after conversation is created
+        setMessages(prev => [...prev, userMessage]);
+        // Save the user message to context immediately
+        addMessage(conversationId, userMessage);
+        // setIsCreatingConversation(false);
+        // Update URL immediately after conversation is created
+        console.log('🔄 Updating URL to include conversation ID:', conversationId);
+        console.log('🔄 Current state before URL update:', {
+          currentConversationId,
+          messagesCount: messages.length,
+          isCreatingConversation
+        });
+        router.replace(`/dashboard?conversation=${conversationId}`);
+        
+        // DON'T set isCreatingConversation to false yet - wait until after the entire message flow
+      } catch (error) {
+        console.error('Failed to create conversation:', error);
+        setIsCreatingConversation(false);
+        // Show error message and return early
+        const errorMessage = MessageUtils.createBotMessage(
+          'Erreur lors de la création de la conversation. Veuillez réessayer.'
+        );
+        setMessages(prev => [...prev, errorMessage]);
+        return;
+      }
+    } else {
+      // If conversation exists, add message to state immediately
+      setMessages(prev => [...prev, userMessage]);
+    }
+
+    setInputMessage('');
+
+    try {
+      setIsLoading(true);
+
+      // Create bot typing message placeholder
+      const botMessage = MessageUtils.createTypingMessage();
+      setMessages(prev => [...prev, botMessage]);
+
+      let botResponseContent = '';
+
+      if (useStreaming) {
+        // Try streaming first
+        try {
+          await apiService.sendStreamingMessage(
+            conversationId,
+            messageContent,
+            (chunk) => {
+              botResponseContent = chunk;
+              setMessages(prev => 
+                prev.map(msg => 
+                  msg.id === botMessage.id 
+                    ? { ...msg, content: chunk, isTyping: false }
+                    : msg
+                )
+              );
+            }
+          );
+        } catch (streamError) {
+          console.log('Streaming failed, falling back to regular API');
+          const result = await apiService.sendMessage(conversationId, messageContent);
+          
+          if (result && result.response) {
+            botResponseContent = result.response;
+            setMessages(prev =>
+              prev.map(msg =>
+                msg.id === botMessage.id
+                  ? { ...msg, content: result.response, isTyping: false }
+                  : msg
+              )
+            );
+          }
+        }
+      } else {
+        // Use regular API
+        const result = await apiService.sendMessage(conversationId, messageContent);
+        
+        if (result && result.response) {
+          botResponseContent = result.response;
+          setMessages(prev =>
+            prev.map(msg =>
+              msg.id === botMessage.id
+                ? { ...msg, content: result.response, isTyping: false }
+                : msg
+            )
+          );
+        }
+      }
+
+      // Save the user message to context if we haven't already (for existing conversations)
+      if (currentConversationId) {
+        addMessage(conversationId, userMessage);
+      }
+      
+      // Save the bot response
+      if (botResponseContent) {
+        const finalBotMessage = MessageUtils.createBotMessage(botResponseContent);
+        addMessage(conversationId, finalBotMessage);
+        
+        // Update the conversation's updatedAt timestamp using context function
+        updateConversationTimestamp(conversationId);
+        
+        // Check if this is a new conversation (title is still default) and update title based on user message
+        const conversation = getConversationById(conversationId);
+        if (conversation && (conversation.title === 'Nouvelle conversation' || !conversation.title)) {
+          console.log('🏷️ Updating title for new conversation based on user message:', messageContent);
+          updateConversationTitle(conversationId, messageContent);
+        }
+      }
+
+    } catch (error) {
+      console.error('Error sending message:', error);
+      
+      // Remove the loading bot message and show error
+      setMessages(prev => prev.slice(0, -1));
+      const errorMessage = MessageUtils.createBotMessage(
+        'Désolé, une erreur est survenue. Veuillez réessayer.'
+      );
+      setMessages(prev => [...prev, errorMessage]);
+    } finally {
+      setIsLoading(false);
+      // Reset the creating conversation flag - this allows the useEffect to load conversations again
+      setIsCreatingConversation(false);
+    }
+  }, [currentConversationId, isCreatingConversation, createNewConversation, updateConversationTimestamp, updateConversationTitle, addMessage, getConversationById, router]);
+
+  const handleQuickQuestion = useCallback((question) => {
+    setInputMessage(question);
+    sendMessage(question);
+  }, [sendMessage]);
+
+  const startNewConversation = useCallback(() => {
+    // Check if we're already at empty dashboard state (no conversation selected and no messages)
+    console.log('🔄 currentConversationId', currentConversationId);
+    console.log('🔄 messages', messages);
+    if (!currentConversationId && (!messages || messages.length === 0)) {
+      console.log('🔄 Already at empty dashboard state, no need to redirect');
+      return;
+    }
+
+    // Clear current conversation state and redirect to dashboard
+    console.log('🔄 Clearing conversation state and redirecting to dashboard');
+    setIsClearingConversation(true);
+    setCurrentConversationId(null);
+    setMessages([]);
+    setInputMessage('');
+    setIsLoadingConversation(false);
+    setIsCreatingConversation(false);
+    
+    // Navigate to dashboard without query parameters
+    router.replace('/dashboard');
+  }, [router, currentConversationId, messages]);
+
+  const goToConversations = useCallback(() => {
+    router.push('/conversations');
+  }, [router]);
+
+  const goToProfile = useCallback(() => {
+    router.push('/profile');
+  }, [router]);
+
+  const handleLogout = useCallback(() => {
+    authService.logout();
+  }, []);
+
+  const toggleDropdown = useCallback(() => {
+    setShowDropdown(prev => !prev);
+  }, []);
+
+  const closeDropdown = useCallback(() => {
+    setShowDropdown(false);
+  }, []);
+
+  const handleDeleteConversation = useCallback(async (conversationId) => {
+    try {
+      // Delete using context function
+      await deleteConversation(conversationId);
+      
+      // If we're currently viewing the deleted conversation, redirect to dashboard
+      if (currentConversationId === conversationId) {
+        setCurrentConversationId(null);
+        setMessages([]);
+        router.push('/dashboard');
+      }
+      
+      return true;
+    } catch (error) {
+      console.error('Error deleting conversation:', error);
+      
+      // If the conversation doesn't exist, still clean up local state
+      if (error.message.includes('does not exist') || 
+          error.message.includes('not found') ||
+          error.message.includes('404')) {
+        console.log('Conversation already deleted on backend, cleaning up local state');
+        
+        // If we're currently viewing the deleted conversation, redirect to dashboard
+        if (currentConversationId === conversationId) {
+          setCurrentConversationId(null);
+          setMessages([]);
+          router.push('/dashboard');
+        }
+        
+        return true; // Consider it successful since the goal (conversation deleted) is achieved
+      }
+      
+      // For other errors, return false to indicate failure
+      return false;
+    }
+  }, [currentConversationId, router, deleteConversation]);
+
+  return {
+    // State
+    messages,
+    inputMessage,
+    isLoading,
+    isLoadingConversation,
+    isCreatingConversation,
+    isClearingConversation,
+    conversations,
+    showDropdown,
+    user,
+    currentConversationId,
+
+    // Actions
+    setInputMessage,
+    sendMessage,
+    startNewConversation,
+    loadConversation,
+    handleQuickQuestion,
+    goToConversations,
+    goToProfile,
+    handleLogout,
+    toggleDropdown,
+    closeDropdown,
+    deleteConversation: handleDeleteConversation
+  };
+}; 

@@ -1,0 +1,14 @@
+module.exports = {
+  apps: [
+    {
+      name: 'nextjs-app',
+      script: 'npm',
+      args: 'start',
+      env: {
+        PORT: 4042,
+        NODE_ENV: 'production'
+      }
+    }
+  ]
+};
+

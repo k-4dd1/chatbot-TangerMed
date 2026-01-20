@@ -1,0 +1,36 @@
+import { Geist, Geist_Mono } from "next/font/google";
+import "./globals.css";
+import { AuthProvider } from "../contexts/AuthContext";
+import { ThemeProvider } from "../contexts/ThemeContext";
+import { ConversationsProvider } from "../contexts/ConversationsContext";
+
+const geistSans = Geist({
+  variable: "--font-geist-sans",
+  subsets: ["latin"],
+});
+
+const geistMono = Geist_Mono({
+  variable: "--font-geist-mono",
+  subsets: ["latin"],
+});
+
+export const metadata = {
+  title: "Tanger Med - MedBot",
+  description: "Plateforme MedBot de Tanger Med Special Agency",
+};
+
+export default function RootLayout({ children }) {
+  return (
+    <html lang="fr" className="theme-blue dark" suppressHydrationWarning={true}>
+      <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
+        <ThemeProvider>
+          <AuthProvider>
+            <ConversationsProvider>
+              {children}
+            </ConversationsProvider>
+          </AuthProvider>
+        </ThemeProvider>
+      </body>
+    </html>
+  );
+}

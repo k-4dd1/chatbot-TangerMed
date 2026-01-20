@@ -1,0 +1,178 @@
+"use client";
+
+import React, { useState, useEffect } from "react";
+import { motion, AnimatePresence } from "framer-motion";
+import { MoreVertical, Trash2, Loader2 } from "lucide-react";
+import { cn } from "../../lib/utils";
+import { useConversationsContext } from "../../contexts/ConversationsContext";
+
+export function ConversationItem({
+  conversation,
+  selectedConversation,
+  hoveredConversation,
+  setHoveredConversation,
+  openDropdownId,
+  setOpenDropdownId,
+  isDarkMode,
+  handleConversationSelect,
+  handleDeleteConversation
+}) {
+  const { fetchLastMessage } = useConversationsContext();
+  const [lastMessage, setLastMessage] = useState('Chargement...');
+  const [isLoadingMessage, setIsLoadingMessage] = useState(true);
+
+  // Fetch the last message when component mounts
+  useEffect(() => {
+    const loadLastMessage = async () => {
+      setIsLoadingMessage(true);
+      try {
+        const message = await fetchLastMessage(conversation.id);
+        setLastMessage(message);
+      } catch (error) {
+        console.error('Failed to load last message:', error);
+        setLastMessage('Erreur de chargement');
+      } finally {
+        setIsLoadingMessage(false);
+      }
+    };
+
+    loadLastMessage();
+  }, [conversation.id, fetchLastMessage]);
+
+  // Handle three dots menu toggle
+  const toggleDropdownMenu = (e) => {
+    e.stopPropagation();
+    setOpenDropdownId(openDropdownId === conversation.id ? null : conversation.id);
+  };
+
+  return (
+    <div
+      key={conversation.id}
+      className={cn(
+        "w-full px-3 py-2 rounded-md transition-all duration-200 group cursor-pointer relative",
+        selectedConversation === conversation.id ? "bg-blue-100" : ""
+      )}
+      onMouseEnter={() => setHoveredConversation(conversation.id)}
+      onMouseLeave={() => setHoveredConversation(null)}
+    >
+      <div className="flex items-start justify-between">
+        <div
+          className="flex-1 min-w-0 pr-2"
+          onClick={() => handleConversationSelect(conversation.id)}
+        >
+          <div className="flex items-start justify-between mb-1">
+            <h3 className={cn(
+              "font-medium text-sm truncate flex-1 pr-2",
+              selectedConversation === conversation.id
+                ? isDarkMode
+                  ? "text-blue-100"
+                  : "text-blue-900"
+                : isDarkMode ? "text-slate-100" : "text-gray-800"
+            )}>
+              {conversation.title || 'Nouvelle conversation'}
+            </h3>
+            <span className={cn(
+              "text-xs flex-shrink-0",
+              selectedConversation === conversation.id
+                ? isDarkMode
+                  ? "text-blue-300"
+                  : "text-blue-700"
+                : isDarkMode ? "text-slate-500" : "text-gray-500"
+            )}>
+              {conversation.timestamp}
+            </span>
+          </div>
+          <div className="flex items-center">
+            {isLoadingMessage ? (
+              <div className="flex items-center space-x-2">
+                <Loader2 className={cn(
+                  "h-3 w-3 animate-spin",
+                  selectedConversation === conversation.id
+                    ? isDarkMode
+                      ? "text-blue-200"
+                      : "text-blue-700"
+                    : isDarkMode ? "text-slate-400" : "text-gray-600"
+                )} />
+                <p className={cn(
+                  "text-xs",
+                  selectedConversation === conversation.id
+                    ? isDarkMode
+                      ? "text-blue-200"
+                      : "text-blue-700"
+                    : isDarkMode ? "text-slate-400" : "text-gray-600"
+                )}>
+                  Chargement...
+                </p>
+              </div>
+            ) : (
+              <p className={cn(
+                "text-xs truncate",
+                selectedConversation === conversation.id
+                  ? isDarkMode
+                    ? "text-blue-200"
+                    : "text-blue-700"
+                  : isDarkMode ? "text-slate-400" : "text-gray-600"
+              )}>
+                {lastMessage.length > 60 ? lastMessage.substring(0, 60) + '...' : lastMessage}
+              </p>
+            )}
+          </div>
+        </div>
+
+        {/* Three dots menu - appears on hover */}
+        <div className="relative flex-shrink-0">
+          <button
+            onClick={toggleDropdownMenu}
+            className={cn(
+              "transition-all duration-200 p-1.5 rounded-lg hover:scale-110 flex-shrink-0",
+              openDropdownId === conversation.id || hoveredConversation === conversation.id
+                ? "opacity-100"
+                : "opacity-0 group-hover:opacity-100",
+              selectedConversation === conversation.id
+                ? isDarkMode
+                  ? "hover:bg-slate-700/50 text-blue-200 hover:text-blue-100"
+                  : "hover:bg-blue-700/20 text-blue-700 hover:text-blue-800"
+                : isDarkMode
+                  ? "hover:bg-slate-700/50 text-slate-400 hover:text-slate-200"
+                  : "hover:bg-gray-500/20 text-gray-600 hover:text-gray-800"
+            )}
+            title="Options"
+          >
+            <MoreVertical className="h-4 w-4" />
+          </button>
+
+          {/* Dropdown menu */}
+          <AnimatePresence>
+            {openDropdownId === conversation.id && (
+              <motion.div
+                initial={{ opacity: 0, scale: 0.9, y: -10 }}
+                animate={{ opacity: 1, scale: 1, y: 0 }}
+                exit={{ opacity: 0, scale: 0.9, y: -10 }}
+                transition={{ type: "spring", stiffness: 500, damping: 30 }}
+                className={cn(
+                  "absolute right-0 top-8 rounded-lg shadow-xl py-1 w-32 z-50 border",
+                  isDarkMode
+                    ? 'bg-slate-800 border-slate-700 shadow-2xl shadow-slate-900/70'
+                    : 'bg-white border-gray-200 shadow-2xl shadow-slate-900/20'
+                )}
+              >
+                <button
+                  onClick={(e) => handleDeleteConversation(e, conversation.id)}
+                  className={cn(
+                    "w-full px-3 py-2 text-left flex items-center space-x-2 transition-colors text-sm",
+                    isDarkMode
+                      ? ' text-red-400 hover:text-red-300'
+                      : ' text-red-600 hover:text-red-700'
+                  )}
+                >
+                  <Trash2 className="h-3.5 w-3.5" />
+                  <span>Supprimer</span>
+                </button>
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </div>
+      </div>
+    </div>
+  );
+} 

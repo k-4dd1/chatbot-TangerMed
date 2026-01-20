@@ -1,0 +1,360 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Base root styles - fallback values */
+:root {
+  font-family: system-ui, -apple-system, sans-serif;
+}
+
+/* Blue Theme - Light Mode */
+.theme-blue {
+  --background: #ffffff;
+  --foreground: #475569;
+  --card: #f1f5f9;
+  --card-foreground: #475569;
+  --popover: #ffffff;
+  --popover-foreground: #475569;
+  --primary: #3b82f6;
+  --primary-foreground: #ffffff;
+  --secondary: #60a5fa;
+  --secondary-foreground: #ffffff;
+  --muted: #f1f5f9;
+  --muted-foreground: #475569;
+  --accent: #60a5fa;
+  --accent-foreground: #ffffff;
+  --destructive: #be123c;
+  --destructive-foreground: #ffffff;
+  --border: #e5e7eb;
+  --input: #ffffff;
+  --ring: #3b82f6;
+  --sidebar: #f1f5f9;
+  --sidebar-foreground: #475569;
+  --sidebar-primary: #3b82f6;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: #60a5fa;
+  --sidebar-accent-foreground: #ffffff;
+  --sidebar-border: #e5e7eb;
+  --sidebar-ring: #3b82f6;
+  
+  /* Blue color scale for light mode */
+  --theme-blue-50: #eff6ff;
+  --theme-blue-100: #dbeafe;
+  --theme-blue-200: #bfdbfe;
+  --theme-blue-300: #93c5fd;
+  --theme-blue-400: #60a5fa;
+  --theme-blue-700: #3b82f6;
+  --theme-blue-700: #2563eb;
+  --theme-blue-700: #1d4ed8;
+  --theme-blue-800: #1e40af;
+  --theme-blue-900: #1e3a8a;
+  --theme-blue-950: #172554;
+  
+  /* Light blue color scale for light mode */
+  --theme-light-blue-50: #f0f9ff;
+  --theme-light-blue-100: #e0f2fe;
+  --theme-light-blue-200: #bae6fd;
+  --theme-light-blue-300: #7dd3fc;
+  --theme-light-blue-400: #38bdf8;
+  --theme-light-blue-700: #0ea5e9;
+  --theme-light-blue-700: #0284c7;
+  --theme-light-blue-700: #0369a1;
+  --theme-light-blue-800: #075985;
+  --theme-light-blue-900: #0c4a6e;
+  --theme-light-blue-950: #082f49;
+}
+
+/* Blue Theme - Dark Mode */
+.dark.theme-blue {
+  --background: #0f172a;
+  --foreground: #f1f5f9;
+  --card: #1e293b;
+  --card-foreground: #f1f5f9;
+  --popover: #1e293b;
+  --popover-foreground: #f1f5f9;
+  --primary: #60a5fa;
+  --primary-foreground: #0f172a;
+  --secondary: #3b82f6;
+  --secondary-foreground: #f1f5f9;
+  --muted: #334155;
+  --muted-foreground: #94a3b8;
+  --accent: #60a5fa;
+  --accent-foreground: #0f172a;
+  --destructive: #f87171;
+  --destructive-foreground: #0f172a;
+  --border: #334155;
+  --input: #1e293b;
+  --ring: #60a5fa;
+  --sidebar: #1e293b;
+  --sidebar-foreground: #f1f5f9;
+  --sidebar-primary: #60a5fa;
+  --sidebar-primary-foreground: #0f172a;
+  --sidebar-accent: #3b82f6;
+  --sidebar-accent-foreground: #f1f5f9;
+  --sidebar-border: #334155;
+  --sidebar-ring: #60a5fa;
+  
+  /* Blue color scale for dark mode - adjusted for better contrast */
+  --theme-blue-50: #1e3a8a;
+  --theme-blue-100: #1e40af;
+  --theme-blue-200: #1d4ed8;
+  --theme-blue-300: #2563eb;
+  --theme-blue-400: #3b82f6;
+  --theme-blue-700: #60a5fa;
+  --theme-blue-700: #93c5fd;
+  --theme-blue-700: #bfdbfe;
+  --theme-blue-800: #dbeafe;
+  --theme-blue-900: #eff6ff;
+  --theme-blue-950: #f8fafc;
+  
+  /* Light blue color scale for dark mode - adjusted for better contrast */
+  --theme-light-blue-50: #0c4a6e;
+  --theme-light-blue-100: #075985;
+  --theme-light-blue-200: #0369a1;
+  --theme-light-blue-300: #0284c7;
+  --theme-light-blue-400: #0ea5e9;
+  --theme-light-blue-700: #38bdf8;
+  --theme-light-blue-700: #7dd3fc;
+  --theme-light-blue-700: #bae6fd;
+  --theme-light-blue-800: #e0f2fe;
+  --theme-light-blue-900: #f0f9ff;
+  --theme-light-blue-950: #f8fafc;
+}
+
+/* Green Theme - Light Mode */
+.theme-green {
+  --background: #ffffff;
+  --foreground: #374151;
+  --card: #f0fdf4;
+  --card-foreground: #374151;
+  --popover: #ffffff;
+  --popover-foreground: #374151;
+  --primary: #059669;
+  --primary-foreground: #ffffff;
+  --secondary: #34d399;
+  --secondary-foreground: #ffffff;
+  --muted: #f0fdf4;
+  --muted-foreground: #374151;
+  --accent: #34d399;
+  --accent-foreground: #ffffff;
+  --destructive: #dc2626;
+  --destructive-foreground: #ffffff;
+  --border: #d1d5db;
+  --input: #ffffff;
+  --ring: #059669;
+  --sidebar: #f0fdf4;
+  --sidebar-foreground: #374151;
+  --sidebar-primary: #059669;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: #34d399;
+  --sidebar-accent-foreground: #ffffff;
+  --sidebar-border: #d1d5db;
+  --sidebar-ring: #059669;
+  
+  /* Blue color scale for green theme - maintains blue accents */
+  --theme-blue-50: #eff6ff;
+  --theme-blue-100: #dbeafe;
+  --theme-blue-200: #bfdbfe;
+  --theme-blue-300: #93c5fd;
+  --theme-blue-400: #60a5fa;
+  --theme-blue-700: #3b82f6;
+  --theme-blue-700: #2563eb;
+  --theme-blue-700: #1d4ed8;
+  --theme-blue-800: #1e40af;
+  --theme-blue-900: #1e3a8a;
+  --theme-blue-950: #172554;
+  
+  /* Light blue color scale for green theme */
+  --theme-light-blue-50: #f0f9ff;
+  --theme-light-blue-100: #e0f2fe;
+  --theme-light-blue-200: #bae6fd;
+  --theme-light-blue-300: #7dd3fc;
+  --theme-light-blue-400: #38bdf8;
+  --theme-light-blue-700: #0ea5e9;
+  --theme-light-blue-700: #0284c7;
+  --theme-light-blue-700: #0369a1;
+  --theme-light-blue-800: #075985;
+  --theme-light-blue-900: #0c4a6e;
+  --theme-light-blue-950: #082f49;
+}
+
+/* Green Theme - Dark Mode */
+.dark.theme-green {
+  --background: #0f1a0f;
+  --foreground: #f0fdf4;
+  --card: #1a2e1a;
+  --card-foreground: #f0fdf4;
+  --popover: #1a2e1a;
+  --popover-foreground: #f0fdf4;
+  --primary: #34d399;
+  --primary-foreground: #0f1a0f;
+  --secondary: #059669;
+  --secondary-foreground: #f0fdf4;
+  --muted: #16a34a;
+  --muted-foreground: #a7f3d0;
+  --accent: #34d399;
+  --accent-foreground: #0f1a0f;
+  --destructive: #f87171;
+  --destructive-foreground: #0f1a0f;
+  --border: #16a34a;
+  --input: #1a2e1a;
+  --ring: #34d399;
+  --sidebar: #1a2e1a;
+  --sidebar-foreground: #f0fdf4;
+  --sidebar-primary: #34d399;
+  --sidebar-primary-foreground: #0f1a0f;
+  --sidebar-accent: #059669;
+  --sidebar-accent-foreground: #f0fdf4;
+  --sidebar-border: #16a34a;
+  --sidebar-ring: #34d399;
+  
+  /* Blue color scale for green dark theme */
+  --theme-blue-50: #1e3a8a;
+  --theme-blue-100: #1e40af;
+  --theme-blue-200: #1d4ed8;
+  --theme-blue-300: #2563eb;
+  --theme-blue-400: #3b82f6;
+  --theme-blue-700: #60a5fa;
+  --theme-blue-700: #93c5fd;
+  --theme-blue-700: #bfdbfe;
+  --theme-blue-800: #dbeafe;
+  --theme-blue-900: #eff6ff;
+  --theme-blue-950: #f8fafc;
+  
+  /* Light blue color scale for green dark theme */
+  --theme-light-blue-50: #0c4a6e;
+  --theme-light-blue-100: #075985;
+  --theme-light-blue-200: #0369a1;
+  --theme-light-blue-300: #0284c7;
+  --theme-light-blue-400: #0ea5e9;
+  --theme-light-blue-700: #38bdf8;
+  --theme-light-blue-700: #7dd3fc;
+  --theme-light-blue-700: #bae6fd;
+  --theme-light-blue-800: #e0f2fe;
+  --theme-light-blue-900: #f0f9ff;
+  --theme-light-blue-950: #f8fafc;
+}
+
+body {
+  background-color: var(--background);
+  color: var(--foreground);
+  font-family: system-ui, -apple-system, sans-serif;
+}
+
+/* Custom Scrollbar Styles - Blue Theme */
+.theme-blue .custom-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: #b3d0fe transparent;
+}
+
+.theme-blue .custom-scrollbar::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+.theme-blue .custom-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+  border-radius: 4px;
+}
+
+.theme-blue .custom-scrollbar::-webkit-scrollbar-thumb {
+  background: linear-gradient(180deg, #3b82f6, #2563eb);
+  border-radius: 4px;
+  transition: all 0.2s ease;
+  border: 1px solid rgba(59, 130, 246, 0.2);
+}
+
+.theme-blue .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: linear-gradient(180deg, #2563eb, #1d4ed8);
+  transform: scale(1.05);
+}
+
+.theme-blue .custom-scrollbar::-webkit-scrollbar-thumb:active {
+  background: linear-gradient(180deg, #1d4ed8, #1e40af);
+}
+
+/* Blue Dark mode scrollbar */
+.dark.theme-blue .custom-scrollbar {
+  scrollbar-color: #60a5fa transparent;
+}
+
+.dark.theme-blue .custom-scrollbar::-webkit-scrollbar-thumb {
+  background: linear-gradient(180deg, #60a5fa, #3b82f6);
+  border: 1px solid rgba(96, 165, 250, 0.2);
+}
+
+.dark.theme-blue .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: linear-gradient(180deg, #93c5fd, #60a5fa);
+  transform: scale(1.05);
+}
+
+.dark.theme-blue .custom-scrollbar::-webkit-scrollbar-thumb:active {
+  background: linear-gradient(180deg, #dbeafe, #93c5fd);
+}
+
+/* Custom Scrollbar Styles - Green Theme */
+.theme-green .custom-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: rgb(5 150 105 / 0.3) transparent;
+}
+
+.theme-green .custom-scrollbar::-webkit-scrollbar {
+  width: 6px;
+}
+
+.theme-green .custom-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.theme-green .custom-scrollbar::-webkit-scrollbar-thumb {
+  background-color: rgb(5 150 105 / 0.3);
+  border-radius: 3px;
+  transition: background-color 0.2s ease;
+}
+
+.theme-green .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background-color: rgb(5 150 105 / 0.5);
+}
+
+/* Green Dark mode scrollbar */
+.dark.theme-green .custom-scrollbar {
+  scrollbar-color: rgb(52 211 153 / 0.3) transparent;
+}
+
+.dark.theme-green .custom-scrollbar::-webkit-scrollbar-thumb {
+  background-color: rgb(52 211 153 / 0.3);
+}
+
+.dark.theme-green .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background-color: rgb(52 211 153 / 0.5);
+}
+
+
+
+/* Glassmorphism effect */
+.glass-effect {
+  backdrop-filter: blur(16px) saturate(150%);
+  -webkit-backdrop-filter: blur(16px) saturate(150%);
+  background: rgba(255, 255, 255, 0.1) !important;
+  border-top: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.dark .glass-effect {
+  background: rgba(0, 0, 0, 0.2) !important;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+/* Glassmorphism effect for sidebar */
+.glass-effect-sidebar {
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  background: rgba(255, 255, 255, 0.7) !important;
+  border-top: 1px solid rgba(255, 255, 255, 0.3);
+  box-shadow: 0 -8px 32px rgba(0, 0, 0, 0.1);
+}
+
+.dark .glass-effect-sidebar {
+  background: rgba(0, 0, 0, 0.4) !important;
+  border-top: 1px solid rgba(255, 255, 255, 0.15);
+  box-shadow: 0 -8px 32px rgba(0, 0, 0, 0.3);
+}

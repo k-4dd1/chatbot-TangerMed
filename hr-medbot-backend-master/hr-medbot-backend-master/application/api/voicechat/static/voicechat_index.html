@@ -1,0 +1,377 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>PhoneBooth Client</title>
+  <style>
+    /* ---------- Global Layout ---------- */
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap');
+    html,body { height: 100%; margin: 0; }
+    body {
+      font-family: 'Inter', sans-serif;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      background: linear-gradient(135deg,#ece9e6 0%,#ffffff 100%);
+      color: #333;
+    }
+
+    .card {
+      background: #fff;
+      padding: 40px 60px;
+      border-radius: 12px;
+      box-shadow: 0 8px 16px rgba(0,0,0,0.15);
+      text-align: center;
+    }
+
+    /* ---------- Status Indicator ---------- */
+    #status { font-size: 1.4rem; margin-bottom: 24px; display:flex; align-items:center; justify-content:center; gap:8px; }
+    .dot {
+      height: 18px; width: 18px; border-radius: 50%; display: inline-block; margin-right: 8px;
+    }
+    .rec { background: red; animation: blink 1s steps(1) infinite; }
+    .think { background: gold; animation: pulse 2s infinite ease-in-out; }
+    .talk { background: #4CAF50; }
+    @keyframes blink { 50% { opacity: 0.2; } }
+    @keyframes pulse { 0%{transform:scale(0.9);}50%{transform:scale(1.1);}100%{transform:scale(0.9);} }
+    #hint { color: #888; margin-top: 40px; font-size:0.9rem; }
+
+    /* ---------- Controls ---------- */
+    #speaker-container { margin-bottom: 28px; }
+    select, button {
+      padding: 8px 12px;
+      font-size: 1rem;
+      border-radius: 6px;
+      border: 1px solid #ccc;
+      background:#fff;
+      transition: background 0.2s;
+    }
+    button:hover, select:hover { background:#f7f7f7; }
+    #previewBtn { margin-left: 12px; }
+    .hidden { display:none; }
+  </style>
+</head>
+<body>
+  <!-- Login Card -->
+  <div class="card" id="login-card" style="display:none;">
+    <h2 style="margin-top:0">Login</h2>
+    <input id="login-username" placeholder="Username" style="width:100%;padding:8px;margin-bottom:12px;"/>
+    <input id="login-password" type="password" placeholder="Password" style="width:100%;padding:8px;margin-bottom:20px;"/>
+    <button id="login-btn" style="width:100%;">Login</button>
+    <div id="login-error" style="color:red;margin-top:12px;display:none;"></div>
+  </div>
+
+  <!-- Voice Chat Card -->
+  <div class="card hidden" id="chat-card">
+    <div id="speaker-container">
+      <label for="speakerSelect">Voice:&nbsp;</label>
+      <select id="speakerSelect"></select>
+      <button id="previewBtn" title="Preview selected voice">▶ Preview</button>
+    </div>
+    <div id="status"><span class="dot" id="dot"></span><span id="msg">Idle</span></div>
+    <div id="hint">Hold SPACE to talk</div>
+  </div>
+
+<script>
+const AUTH_TOKEN_KEY = "access_token";
+// Helper function to prefix URLs with PROXY_PREFIX
+function prefixUrl(url) {
+  const prefix = window.PROXY_PREFIX || "";
+  if (!prefix) return url;
+  // Handle absolute paths
+  if (url.startsWith("/")) {
+    return prefix + url;
+  }
+  // Handle relative paths (e.g., "./speakers")
+  if (url.startsWith("./")) {
+    // Get current path and construct relative to proxy prefix
+    const currentPath = window.location.pathname;
+    const basePath = currentPath.substring(0, currentPath.lastIndexOf("/"));
+    return prefix + basePath + url.substring(1); // Remove leading "."
+  }
+  // Handle other relative URLs
+  return prefix + "/" + url;
+}
+
+async function login(username, password) {
+  const resp = await fetch(prefixUrl("/auth/token"), {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ username, password }),
+  });
+  if (!resp.ok) {
+    throw new Error("Invalid credentials");
+  }
+  const data = await resp.json();
+  return data.access_token;
+}
+
+function showLogin() {
+  document.getElementById("login-card").style.display = "block";
+  document.getElementById("chat-card").classList.add("hidden");
+}
+
+function hideLogin() {
+  document.getElementById("login-card").style.display = "none";
+  document.getElementById("chat-card").classList.remove("hidden");
+}
+
+// Added: verify a stored access token before using it
+async function verifyToken(token) {
+  if (!token) return false;
+  try {
+    const resp = await fetch(prefixUrl("/auth/me"), {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    return resp.ok;
+  } catch {
+    return false;
+  }
+}
+
+// ---------------- Voice Chat ----------------
+async function initVoiceChat(authToken) {
+  hideLogin();
+
+  // Utility: encode Float32 PCM (mono) to 16-bit WAV ArrayBuffer
+  function encodeWav(buffers, sampleRate) {
+    const length = buffers.reduce((acc, b) => acc + b.length, 0);
+    const wavBuffer = new ArrayBuffer(44 + length * 2);
+    const view = new DataView(wavBuffer);
+    /* RIFF header */
+    function writeString(offset, str) { for(let i=0;i<str.length;i++) view.setUint8(offset+i, str.charCodeAt(i)); }
+    writeString(0, 'RIFF');
+    view.setUint32(4, 36 + length * 2, true);
+    writeString(8, 'WAVE');
+    writeString(12, 'fmt ');
+    view.setUint32(16, 16, true); // PCM chunk size
+    view.setUint16(20, 1, true);  // Audio format = PCM
+    view.setUint16(22, 1, true);  // Mono
+    view.setUint32(24, sampleRate, true);
+    view.setUint32(28, sampleRate * 2, true); // byte rate
+    view.setUint16(32, 2, true);  // block align
+    view.setUint16(34, 16, true); // bits per sample
+    writeString(36, 'data');
+    view.setUint32(40, length * 2, true);
+    // PCM samples
+    let offset = 44;
+    buffers.forEach(chunk => {
+      for(let i=0; i<chunk.length; i++) {
+        const s = Math.max(-1, Math.min(1, chunk[i]));
+        view.setInt16(offset, s < 0 ? s * 0x8000 : s * 0x7FFF, true);
+        offset += 2;
+      }
+    });
+    return wavBuffer;
+  }
+
+  const statusDot = document.getElementById('dot');
+  const statusMsg = document.getElementById('msg');
+  const speakerSelect = document.getElementById('speakerSelect');
+
+  // Fetch available speakers and populate dropdown
+  const speakerResp = await fetch(prefixUrl('./speakers'), {
+    headers: authToken ? { Authorization: `Bearer ${authToken}` } : {},
+  });
+  const speakers = await speakerResp.json(); // {"0": "Name", "1": "Name", ...}
+  Object.entries(speakers).forEach(([key, name]) => {
+    const opt = document.createElement('option');
+    opt.value = key;
+    opt.textContent = `${key} – ${name}`;
+    speakerSelect.appendChild(opt);
+  });
+
+  // Helper to build WebSocket with current speaker value
+  function createWebSocket() {
+    const spk = encodeURIComponent(speakerSelect.value);
+    const wsProto = location.protocol === 'https:' ? 'wss' : 'ws';
+    const tokenParam = authToken ? `&token=${encodeURIComponent(authToken)}` : '';
+    const wsPath = prefixUrl("/voicechat/conversations/chat");
+    const url = `${wsProto}://${location.host}${wsPath}?speaker=${spk}${tokenParam}`;
+    const sock = new WebSocket(url);
+    sock.binaryType = 'arraybuffer';
+    sock.onopen = () => console.log('WS connected');
+    sock.onerror = (e) => console.error('WS error', e);
+    return sock;
+  }
+
+  let ws = createWebSocket();
+
+  // If user changes speaker, reopen WebSocket with new parameter
+  speakerSelect.addEventListener('change', () => {
+    try { ws.close(); } catch(e) {}
+    ws = createWebSocket();
+    attachWsHandlers(ws);
+  });
+
+  function attachWsHandlers(websocket) {
+    // Queue received audio chunks and play sequentially
+    websocket.onmessage = async (ev) => {
+      const buf = ev.data;
+      if (!buf || buf.byteLength === 0) {
+        return; // ignore poison pill
+      }
+      playQueue.push(buf);
+      if (!playing) processQueue();
+    };
+  }
+
+  attachWsHandlers(ws);
+
+  // Recording via Web Audio API
+  let mediaStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+  const ctx = new (window.AudioContext || window.webkitAudioContext)();
+  const sampleRate = ctx.sampleRate; // use device sample rate
+  const source = ctx.createMediaStreamSource(mediaStream);
+  const processor = ctx.createScriptProcessor(4096, 1, 1);
+  const recBuffers = [];
+  let recording = false;
+  processor.onaudioprocess = (e) => {
+    if (!recording) return;
+    recBuffers.push(new Float32Array(e.inputBuffer.getChannelData(0)));
+  };
+  source.connect(processor);
+  processor.connect(ctx.destination);
+
+  function startRecording() {
+    recBuffers.length = 0;
+    recording = true;
+    setStatus('rec');
+  }
+  function stopRecording() {
+    recording = false;
+    setStatus('think');
+    const wav = encodeWav(recBuffers, sampleRate);
+    ws.send(wav);
+  }
+
+  // Keyboard handlers
+  let spaceHeld = false;
+  window.addEventListener('keydown', (e) => {
+    if (e.code === 'Escape') {
+      stopBot();
+      e.preventDefault();
+      return;
+    }
+  });
+  window.addEventListener('keydown', (e) => {
+    if (e.code === 'Space' && !spaceHeld) {
+      stopBot(); // interrupt any ongoing bot speech before new recording
+      spaceHeld = true;
+      startRecording();
+      e.preventDefault();
+    }
+  });
+  window.addEventListener('keyup', (e) => {
+    if (e.code === 'Space' && spaceHeld) {
+      spaceHeld = false;
+      stopRecording();
+      e.preventDefault();
+    }
+  });
+
+  function setStatus(state) {
+    statusDot.className = 'dot ' + state;
+    statusMsg.textContent = {
+      idle: 'Idle',
+      rec: 'Recording...',
+      think: 'Thinking...',
+      talk: 'Speaking...'
+    }[state] || state;
+  }
+  setStatus('idle');
+
+  const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  let playing = false;
+  let currentSource = null; // track current playback to allow hard stop
+  const playQueue = [];
+
+  async function processQueue() {
+    if (playQueue.length === 0) { setStatus('idle'); playing = false; return; }
+    playing = true;
+    setStatus('talk');
+    const buf = playQueue.shift();
+    const audioBuf = await audioCtx.decodeAudioData(buf);
+    currentSource = audioCtx.createBufferSource();
+    currentSource.buffer = audioBuf;
+    currentSource.connect(audioCtx.destination);
+    currentSource.start();
+    currentSource.onended = () => { currentSource = null; processQueue(); };
+  }
+
+  function stopBot() {
+    if (ws && ws.readyState === WebSocket.OPEN) {
+      // Send binary STOP control frame expected by the server
+      ws.send(new TextEncoder().encode('STOP'));
+    }
+    // Clear audio queue and stop current playback
+    playQueue.length = 0;
+    if (currentSource) {
+      try { currentSource.stop(); } catch(e) {}
+      currentSource = null;
+    }
+    playing = false;
+    setStatus('idle');
+  }
+
+  // ---------------- Voice Preview ----------------
+  const previewBtn = document.getElementById('previewBtn');
+  // Use onclick to ensure only one handler (avoids duplicates if initVoiceChat is re-initialized)
+  previewBtn.onclick = async () => {
+    const spk = encodeURIComponent(speakerSelect.value);
+    setStatus('talk');
+    try {
+      const resp = await fetch(prefixUrl(`./speakers/test?speaker=${spk}`), {
+        headers: authToken ? { Authorization: `Bearer ${authToken}` } : {},
+      });
+      if (!resp.ok) throw new Error('Failed to fetch preview');
+      const buf = await resp.arrayBuffer();
+      const audioBuf = await audioCtx.decodeAudioData(buf);
+      const src = audioCtx.createBufferSource();
+      src.buffer = audioBuf;
+      src.connect(audioCtx.destination);
+      src.start();
+      src.onended = () => setStatus('idle');
+    } catch(err) {
+      console.error('Preview error', err);
+      setStatus('idle');
+    }
+  };
+}
+
+// ----------------------------
+// Bootstrap logic
+// ----------------------------
+
+window.addEventListener('DOMContentLoaded', () => {
+  (async () => {
+    const storedToken = localStorage.getItem(AUTH_TOKEN_KEY);
+    if (storedToken && await verifyToken(storedToken)) {
+      initVoiceChat(storedToken);
+    } else {
+      localStorage.removeItem(AUTH_TOKEN_KEY);
+      showLogin();
+    }
+  })();
+
+  // Login button handler
+  document.getElementById('login-btn').addEventListener('click', async () => {
+    const u = document.getElementById('login-username').value.trim();
+    const p = document.getElementById('login-password').value;
+    const errEl = document.getElementById('login-error');
+    errEl.style.display = 'none';
+    if (!u || !p) { errEl.textContent = 'Username & password required'; errEl.style.display='block'; return; }
+    try {
+      const tok = await login(u, p);
+      localStorage.setItem(AUTH_TOKEN_KEY, tok);
+      // removed cookie storage; server expects header, not cookie
+      initVoiceChat(tok);
+    } catch (err) {
+      errEl.textContent = err.message || 'Login failed';
+      errEl.style.display = 'block';
+    }
+  });
+});
+</script>
+</body>
+</html> 

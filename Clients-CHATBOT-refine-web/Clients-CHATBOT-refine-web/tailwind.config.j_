@@ -1,0 +1,86 @@
+/** @type {import('tailwindcss').Config} */
+module.exports = {
+  content: [
+    './src/pages/**/*.{js,ts,jsx,tsx,mdx}',
+    './src/components/**/*.{js,ts,jsx,tsx,mdx}',
+    './src/app/**/*.{js,ts,jsx,tsx,mdx}',
+    './src/**/*.{js,ts,jsx,tsx,mdx}',
+  ],
+  theme: {
+    extend: {
+      colors: {
+        background: 'var(--background)',
+        foreground: 'var(--foreground)',
+        card: {
+          DEFAULT: 'var(--card)',
+          foreground: 'var(--card-foreground)',
+        },
+        popover: {
+          DEFAULT: 'var(--popover)',
+          foreground: 'var(--popover-foreground)',
+        },
+        primary: {
+          DEFAULT: 'var(--primary)',
+          foreground: 'var(--primary-foreground)',
+        },
+        secondary: {
+          DEFAULT: 'var(--secondary)',
+          foreground: 'var(--secondary-foreground)',
+        },
+        muted: {
+          DEFAULT: 'var(--muted)',
+          foreground: 'var(--muted-foreground)',
+        },
+        accent: {
+          DEFAULT: 'var(--accent)',
+          foreground: 'var(--accent-foreground)',
+        },
+        destructive: {
+          DEFAULT: 'var(--destructive)',
+          foreground: 'var(--destructive-foreground)',
+        },
+        border: 'var(--border)',
+        input: 'var(--input)',
+        ring: 'var(--ring)',
+        sidebar: {
+          DEFAULT: 'var(--sidebar)',
+          foreground: 'var(--sidebar-foreground)',
+          primary: 'var(--sidebar-primary)',
+          'primary-foreground': 'var(--sidebar-primary-foreground)',
+          accent: 'var(--sidebar-accent)',
+          'accent-foreground': 'var(--sidebar-accent-foreground)',
+          border: 'var(--sidebar-border)',
+          ring: 'var(--sidebar-ring)',
+        },
+        // Theme-aware blue color abstractions
+        'theme-blue': {
+          50: 'var(--theme-blue-50)',
+          100: 'var(--theme-blue-100)',
+          200: 'var(--theme-blue-200)',
+          300: 'var(--theme-blue-300)',
+          400: 'var(--theme-blue-400)',
+          500: 'var(--theme-blue-700)',
+          600: 'var(--theme-blue-700)',
+          700: 'var(--theme-blue-700)',
+          800: 'var(--theme-blue-800)',
+          900: 'var(--theme-blue-900)',
+          950: 'var(--theme-blue-950)',
+        },
+        'theme-light-blue': {
+          50: 'var(--theme-light-blue-50)',
+          100: 'var(--theme-light-blue-100)',
+          200: 'var(--theme-light-blue-200)',
+          300: 'var(--theme-light-blue-300)',
+          400: 'var(--theme-light-blue-400)',
+          500: 'var(--theme-light-blue-700)',
+          600: 'var(--theme-light-blue-700)',
+          700: 'var(--theme-light-blue-700)',
+          800: 'var(--theme-light-blue-800)',
+          900: 'var(--theme-light-blue-900)',
+          950: 'var(--theme-light-blue-950)',
+        },
+      },
+    },
+  },
+  plugins: [ require('@tailwindcss/typography'),],
+}

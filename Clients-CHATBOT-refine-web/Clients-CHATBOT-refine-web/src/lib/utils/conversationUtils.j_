@@ -1,0 +1,213 @@
+import apiService from '../../services/api';
+import { STORAGE_KEYS } from '../constants/api';
+
+// Simple cache to prevent redundant API calls
+let conversationsCache = null;
+let cacheTimestamp = 0;
+const CACHE_DURATION = 5000; // 5 seconds
+
+export const ConversationUtils = {
+  // Local storage operations
+  getLocalConversations: () => {
+    if (typeof window === 'undefined') return [];
+    const conversations = localStorage.getItem(STORAGE_KEYS.CONVERSATIONS);
+    return conversations ? JSON.parse(conversations) : [];
+  },
+
+  saveLocalConversations: (conversations) => {
+    if (typeof window === 'undefined') return;
+    localStorage.setItem(STORAGE_KEYS.CONVERSATIONS, JSON.stringify(conversations));
+  },
+
+  // API operations with localStorage fallback
+  getAll: async () => {
+    const now = Date.now();
+    
+    // Return cached data if still valid
+    if (conversationsCache && (now - cacheTimestamp < CACHE_DURATION)) {
+      console.log('🔄 ConversationUtils.getAll: Using cached data');
+      return conversationsCache;
+    }
+    
+    try {
+      console.log('🌐 ConversationUtils.getAll: Making API call');
+      const conversations = await apiService.getConversations();
+      
+      // Normalize conversations to ensure they have proper timestamps
+      const normalizedConversations = conversations.map(conv => {
+        const now = new Date();
+        const createdAt = conv.createdAt || conv.created_at || now.toISOString();
+        const updatedAt = conv.updatedAt || conv.updated_at || createdAt;
+        
+        // Validate dates - if they're in the future, use current time
+        const createdDate = new Date(createdAt);
+        const updatedDate = new Date(updatedAt);
+        
+        return {
+          ...conv,
+          createdAt: (isNaN(createdDate.getTime()) || createdDate > now) ? now.toISOString() : createdAt,
+          updatedAt: (isNaN(updatedDate.getTime()) || updatedDate > now) ? now.toISOString() : updatedAt,
+          // Ensure messages array exists and filter out invalid messages
+          messages: (conv.messages || []).filter(msg => msg && typeof msg === 'object' && msg.content)
+        };
+      });
+      
+      // Update cache
+      conversationsCache = normalizedConversations;
+      cacheTimestamp = now;
+      
+      if (typeof window !== 'undefined') {
+        ConversationUtils.saveLocalConversations(normalizedConversations);
+      }
+      return normalizedConversations;
+    } catch (error) {
+      console.warn('API unavailable, using localStorage:', error);
+
+      if (error.message.includes('Authentication required') || error.message.includes('401')) {
+        if (typeof window !== 'undefined') {
+          localStorage.removeItem(STORAGE_KEYS.AUTH_TOKEN);
+          window.location.href = '/web/login';
+        }
+        return [];
+      }
+
+      return ConversationUtils.getLocalConversations();
+    }
+  },
+
+  getById: (id) => {
+    const conversations = ConversationUtils.getLocalConversations();
+    return conversations.find(conv => conv.id === id);
+  },
+
+  create: async (title, initialMessage = null) => {
+    try {
+      const newConversation = await apiService.createConversation(title);
+      if (initialMessage) {
+        await apiService.sendMessage(newConversation.id, initialMessage.content);
+      }
+      // Clear cache to get fresh data
+      ConversationUtils.clearCache();
+      return newConversation;
+    } catch (error) {
+      console.warn('API unavailable, using localStorage:', error);
+      const conversations = ConversationUtils.getLocalConversations();
+      const newConversation = {
+        id: Date.now().toString(),
+        title: title || 'Nouvelle conversation',
+        messages: initialMessage ? [initialMessage] : [],
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+      conversations.unshift(newConversation);
+      ConversationUtils.saveLocalConversations(conversations);
+      return newConversation;
+    }
+  },
+
+  delete: async (id) => {
+    try {
+      await apiService.deleteConversation(id);
+      // Clear cache to get fresh data
+      ConversationUtils.clearCache();
+      return true;
+    } catch (error) {
+      console.warn('API unavailable, using localStorage:', error);
+      const conversations = ConversationUtils.getLocalConversations();
+      const filtered = conversations.filter(conv => conv.id !== id);
+      ConversationUtils.saveLocalConversations(filtered);
+      return true;
+    }
+  },
+
+  updateTitle: (id, newTitle) => {
+    const conversations = ConversationUtils.getLocalConversations();
+    const updated = conversations.map(conv => 
+      conv.id === id ? { 
+        ...conv, 
+        title: newTitle, 
+        updatedAt: new Date().toISOString() 
+      } : conv
+    );
+    ConversationUtils.saveLocalConversations(updated);
+    return updated;
+  },
+
+  addMessage: (conversationId, message) => {
+    const conversations = ConversationUtils.getLocalConversations();
+    const updated = conversations.map(conv => {
+      if (conv.id === conversationId) {
+        return {
+          ...conv,
+          messages: [...(conv.messages || []), message],
+          updatedAt: new Date().toISOString()
+        };
+      }
+      return conv;
+    });
+    ConversationUtils.saveLocalConversations(updated);
+    return updated;
+  },
+
+  exportConversations: () => {
+    const conversations = ConversationUtils.getLocalConversations();
+    const dataStr = JSON.stringify(conversations, null, 2);
+    const dataBlob = new Blob([dataStr], { type: 'application/json' });
+    
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(dataBlob);
+    link.download = `conversations_${new Date().toISOString().split('T')[0]}.json`;
+    link.click();
+  },
+
+  importConversations: (jsonData) => {
+    try {
+      const imported = JSON.parse(jsonData);
+      if (Array.isArray(imported)) {
+        ConversationUtils.saveLocalConversations(imported);
+        return { success: true, count: imported.length };
+      }
+    } catch (error) {
+      return { success: false, error: 'Invalid JSON format' };
+    }
+  },
+
+  // Clear cache to force fresh API call
+  clearCache: () => {
+    conversationsCache = null;
+    cacheTimestamp = 0;
+  },
+
+  // Clean up invalid data from localStorage
+  cleanupLocalStorage: () => {
+    if (typeof window === 'undefined') return;
+    
+    try {
+      const conversations = ConversationUtils.getLocalConversations();
+      const now = new Date();
+      
+      const cleanedConversations = conversations
+        .filter(conv => conv && typeof conv === 'object' && conv.id) // Remove invalid conversations
+        .map(conv => {
+          const createdAt = conv.createdAt || conv.created_at || now.toISOString();
+          const updatedAt = conv.updatedAt || conv.updated_at || createdAt;
+          
+          // Validate dates
+          const createdDate = new Date(createdAt);
+          const updatedDate = new Date(updatedAt);
+          
+          return {
+            ...conv,
+            createdAt: (isNaN(createdDate.getTime()) || createdDate > now) ? now.toISOString() : createdAt,
+            updatedAt: (isNaN(updatedDate.getTime()) || updatedDate > now) ? now.toISOString() : updatedAt,
+            messages: (conv.messages || []).filter(msg => msg && typeof msg === 'object' && msg.content)
+          };
+        });
+      
+      ConversationUtils.saveLocalConversations(cleanedConversations);
+      console.log('✅ Cleaned up localStorage conversations');
+    } catch (error) {
+      console.error('Failed to clean up localStorage:', error);
+    }
+  }
+}; 

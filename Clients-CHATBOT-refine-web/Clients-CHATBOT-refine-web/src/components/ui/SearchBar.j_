@@ -1,0 +1,58 @@
+'use client';
+
+import { Search, Filter } from 'lucide-react';
+import { useTheme } from '../../contexts/ThemeContext';
+
+export const SearchBar = ({ 
+  value, 
+  onChange, 
+  placeholder = "Rechercher...", 
+  onFilterClick,
+  showFilter = false 
+}) => {
+  const { isDarkMode } = useTheme();
+
+  return (
+    <div className={`
+      flex items-center justify-center p-4 rounded-2xl border shadow-md transition-all duration-300 hover:shadow-lg
+      ${isDarkMode 
+        ? 'bg-slate-800 border-slate-700 shadow-lg hover:shadow-xl' 
+        : 'bg-white border-slate-200 shadow-md hover:shadow-lg'
+      }
+    `}>
+      <div className="relative w-full">
+        <Search className={`
+          absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5
+          ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}
+        `} />
+        <input
+          type="text"
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          placeholder={placeholder}
+          className={`
+            w-full pl-12 pr-4 py-3 rounded-xl border-0 focus:outline-none focus:ring-2 font-medium placeholder:font-normal text-[16px] transition-all duration-200
+            ${isDarkMode
+              ? 'bg-transparent text-slate-100 placeholder-slate-400 focus:ring-blue-700 focus:border-blue-700'
+              : 'bg-transparent text-slate-900 placeholder-slate-500 focus:ring-blue-700 focus:border-blue-700'
+            }
+          `}
+        />
+        {showFilter && onFilterClick && (
+          <button
+            onClick={onFilterClick}
+            className={`
+              absolute right-3 top-1/2 transform -translate-y-1/2 p-1 rounded-lg transition-colors duration-200
+              ${isDarkMode
+                ? 'text-slate-400 hover:text-blue-700 hover:bg-blue-700/10'
+                : 'text-slate-500 hover:text-blue-700 hover:bg-blue-50'
+              }
+            `}
+          >
+            <Filter className="w-4 h-4" />
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}; 

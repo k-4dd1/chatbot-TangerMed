@@ -1,0 +1,508 @@
+'use client';
+
+import React, { useState, useEffect } from 'react';
+import { 
+  ArrowLeft, 
+  User, 
+  MapPin, 
+  Building2, 
+  Network,
+  Edit3,
+  Save,
+  X,
+  Key,
+  Palette,
+  Sun,
+  Moon
+} from 'lucide-react';
+import { useRouter } from 'next/navigation';
+import { useAuth } from '../../contexts/AuthContext';
+import { useTheme } from '../../contexts/ThemeContext';
+import ProtectedRoute from '../../components/ProtectedRoute';
+
+const profileFieldsConfig = [
+  {
+    key: 'username',
+    label: "Nom d'utilisateur",
+    icon: User,
+    placeholder: 'Votre matricule',
+    readOnly: true 
+  },
+  {
+    key: 'site',
+    label: 'Site',
+    icon: MapPin,
+    placeholder: 'Entrez votre site'
+  },
+  {
+    key: 'department',
+    label: 'Departement',
+    icon: Building2,
+    placeholder: 'Entrez votre département'
+  },
+  {
+    key: 'hierarchy',
+    label: 'Hiérarchie',
+    icon: Network,
+    placeholder: 'Entrez votre hiérarchie'
+  }
+];
+
+export default function ProfilePage() {
+  const router = useRouter();
+  const { user, updateUser, changePassword, isLoading, refreshUser } = useAuth();
+  const { 
+    theme, 
+    colorScheme, 
+    isDarkMode, 
+    toggleTheme, 
+    changeColorScheme, 
+    changeTheme,
+    availableColorSchemes, 
+    availableThemes 
+  } = useTheme();
+  
+  const [isEditing, setIsEditing] = useState(false);
+  const [profileData, setProfileData] = useState({
+    username: '',
+    site: '',
+    department: '',
+    hierarchy: ''
+  });
+  const [editData, setEditData] = useState({});
+  const [isSaving, setIsSaving] = useState(false);
+  
+  const [showPasswordForm, setShowPasswordForm] = useState(false);
+  const [passwordData, setPasswordData] = useState({
+    old_password: '',
+    new_password: '',
+    confirm_password: ''
+  });
+
+  useEffect(() => {
+    if (user) {
+      const savedProfile = localStorage.getItem('userProfile');
+      let profileInfo;
+      
+      if (savedProfile) {
+        try {
+          profileInfo = JSON.parse(savedProfile);
+        } catch (e) {
+          profileInfo = {};
+        }
+      } else {
+        profileInfo = {};
+      }
+
+      const data = {
+        username: user.username || 'admin',
+        site: profileInfo.site || user.site || 'Non configuré',
+        department: profileInfo.department || user.department || 'Non configuré',
+        hierarchy: profileInfo.hierarchy || user.hierarchy || 'Non configuré'
+      };
+      
+      setProfileData(data);
+      setEditData(data);
+    }
+  }, [user]);
+
+  const handleStartEdit = () => {
+    setIsEditing(true);
+  };
+
+  const handleCancelEdit = () => {
+    setIsEditing(false);
+    setEditData({ ...profileData });
+  };
+
+  const handleFieldChange = (field, value) => {
+    setEditData(prev => ({
+      ...prev,
+      [field]: value
+    }));
+  };
+
+  const handleSave = async () => {
+    setIsSaving(true);
+    
+    try {
+      localStorage.setItem('userProfile', JSON.stringify(editData));
+      setProfileData({ ...editData });
+      setIsEditing(false);
+      
+      // Simple success notification
+      alert('✅ Profil mis à jour avec succès !');
+      
+    } catch (error) {
+      console.error('Error saving profile:', error);
+      alert('Erreur lors de la sauvegarde');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handlePasswordSubmit = async (e) => {
+    e.preventDefault();
+    
+    if (passwordData.new_password !== passwordData.confirm_password) {
+      alert('Les nouveaux mots de passe ne correspondent pas !');
+      return;
+    }
+
+    if (passwordData.new_password.length < 6) {
+      alert('Le nouveau mot de passe doit contenir au moins 6 caractères');
+      return;
+    }
+
+    setIsSaving(true);
+    
+    try {
+      const result = await changePassword(passwordData.old_password, passwordData.new_password);
+      
+      if (result.success) {
+        setShowPasswordForm(false);
+        setPasswordData({
+          old_password: '',
+          new_password: '',
+          confirm_password: ''
+        });
+        alert('🔒 Mot de passe changé avec succès !');
+      } else {
+        alert(`Erreur: ${result.error}`);
+      }
+    } catch (error) {
+      console.error('Error changing password:', error);
+      alert('Erreur lors du changement de mot de passe');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleBack = () => {
+    router.push('/dashboard');
+  };
+
+  const getInitials = (user) => {
+    if (user?.username) {
+      return user.username.charAt(0).toUpperCase();
+    }
+    return 'U';
+  };
+
+  const renderField = (fieldConfig) => {
+    const { key, label, icon: IconComponent, placeholder, readOnly } = fieldConfig;
+    const value = isEditing && !readOnly ? editData[key] || '' : profileData[key] || (readOnly ? 'Non défini' : 'Non configuré');
+
+    return (
+      <div key={key} className="flex items-center space-x-4 p-4 border border-gray-200 rounded-lg bg-gray-50">
+        <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
+          <IconComponent className="w-5 h-5 text-blue-700" />
+        </div>
+        <div className="flex-1">
+          <p className="text-sm font-medium text-gray-600 mb-1">{label}</p>
+          {isEditing && !readOnly ? (
+            <input
+              type="text"
+              value={value}
+              onChange={(e) => handleFieldChange(key, e.target.value)}
+              placeholder={placeholder}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-700 focus:border-blue-700"
+              disabled={isSaving}
+            />
+          ) : (
+            <p className="text-gray-900">{value}</p>
+          )}
+        </div>
+      </div>
+    );
+  };
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="flex flex-col items-center space-y-4">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-700"></div>
+          <p className="text-gray-600">Chargement du profil...</p>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <ProtectedRoute>
+      <div className="min-h-screen bg-background">
+        {/* Simple Header */}
+        <div className="bg-card border-b border-border px-6 py-4">
+          <div className="flex items-center space-x-4">
+            <button
+              onClick={handleBack}
+              className="p-2 hover:bg-muted rounded-lg transition-colors"
+              disabled={isSaving}
+            >
+              <ArrowLeft className="w-5 h-5 text-muted-foreground" />
+            </button>
+            <div>
+              <h1 className="text-xl font-semibold text-foreground">Profil</h1>
+              <p className="text-sm text-muted-foreground">Gérez vos informations personnelles</p>
+            </div>
+          </div>
+        </div>
+
+        {/* Content */}
+        <div className="max-w-2xl mx-auto px-6 py-8 space-y-6">
+          {/* Avatar Section */}
+          <div className="bg-card rounded-lg border border-border p-6">
+            <div className="flex items-center space-x-4">
+              <div className="w-16 h-16 bg-primary rounded-full flex items-center justify-center">
+                <span className="text-xl font-semibold text-primary-foreground">
+                  {getInitials(user)}
+                </span>
+              </div>
+              <div>
+                <h2 className="text-lg font-semibold text-foreground">
+                  {user?.username || 'Utilisateur'}
+                </h2>
+                <p className="text-sm text-muted-foreground">ID: {user?.id}</p>
+              </div>
+            </div>
+          </div>
+
+          {/* Profile Information */}
+          <div className="bg-card rounded-lg border border-border p-6">
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="text-lg font-semibold text-foreground">Informations personnelles</h2>
+              {!isEditing ? (
+                <button
+                  onClick={handleStartEdit}
+                  className="flex items-center px-3 py-2 text-sm bg-blue-50 text-blue-700 rounded-lg hover:bg-blue-100 transition-colors"
+                  disabled={isSaving}
+                >
+                  <Edit3 className="w-4 h-4 mr-2" />
+                  Modifier
+                </button>
+              ) : (
+                <div className="flex space-x-2">
+                  <button
+                    onClick={handleSave}
+                    className="flex items-center px-3 py-2 text-sm bg-green-50 text-green-600 rounded-lg hover:bg-green-100 transition-colors"
+                    disabled={isSaving}
+                  >
+                    <Save className="w-4 h-4 mr-2" />
+                    {isSaving ? 'Sauvegarde...' : 'Sauvegarder'}
+                  </button>
+                  <button
+                    onClick={handleCancelEdit}
+                    className="flex items-center px-3 py-2 text-sm bg-gray-50 text-gray-600 rounded-lg hover:bg-gray-100 transition-colors"
+                    disabled={isSaving}
+                  >
+                    <X className="w-4 h-4 mr-2" />
+                    Annuler
+                  </button>
+                </div>
+              )}
+            </div>
+
+            <div className="space-y-4">
+              {profileFieldsConfig.map(renderField)}
+            </div>
+          </div>
+
+          {/* Theme Selection */}
+           {/* <div className="bg-card rounded-lg border border-border p-6"> */}
+            {/* <div className="flex items-center mb-6">
+              <div className="w-10 h-10 bg-primary/10 rounded-lg flex items-center justify-center mr-4">
+                <Palette className="w-5 h-5 text-primary" />
+              </div>
+              <div>
+                <h2 className="text-lg font-semibold text-foreground">Thème et Apparence</h2>
+                <p className="text-sm text-muted-foreground">Personnalisez l'apparence de l'application</p>
+              </div>
+            </div> */}
+
+            {/* <div className="space-y-6"> */}
+              {/* Color Scheme Selection */}
+              {/* <div>
+                <h3 className="text-sm font-medium text-foreground mb-3">Couleur du thème</h3>
+                <div className="grid grid-cols-2 gap-3">
+                  {availableColorSchemes.map((scheme) => (
+                    <button
+                      key={scheme.value}
+                      onClick={() => changeColorScheme(scheme.value)}
+                      className={`p-4 rounded-lg border-2 transition-all duration-200 hover:scale-105 ${
+                        colorScheme === scheme.value
+                          ? 'border-primary bg-primary/5'
+                          : 'border-border bg-card hover:border-primary/50'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center space-x-3">
+                          <div className={`w-4 h-4 rounded-full ${
+                            scheme.value === 'blue' ? 'bg-blue-700' : 'bg-green-500'
+                          }`}></div>
+                          <span className="text-sm font-medium text-foreground">{scheme.label}</span>
+                        </div>
+                        {colorScheme === scheme.value && (
+                          <div className="w-2 h-2 bg-primary rounded-full"></div>
+                        )}
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              </div> */}
+
+              {/* Mode Selection */}
+              {/* <div>
+                <h3 className="text-sm font-medium text-foreground mb-3">Mode d'affichage</h3>
+                <div className="grid grid-cols-2 gap-3">
+                  {availableThemes.map((themeOption) => (
+                    <button
+                      key={themeOption.value}
+                      onClick={() => changeTheme(themeOption.value)}
+                      className={`p-4 rounded-lg border-2 transition-all duration-200 hover:scale-105 ${
+                        theme === themeOption.value
+                          ? 'border-primary bg-primary/5'
+                          : 'border-border bg-card hover:border-primary/50'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center space-x-3">
+                          {themeOption.value === 'light' ? (
+                            <Sun className="w-4 h-4 text-yellow-500" />
+                          ) : (
+                            <Moon className="w-4 h-4 text-blue-700" />
+                          )}
+                          <span className="text-sm font-medium text-foreground">{themeOption.label}</span>
+                        </div>
+                        {theme === themeOption.value && (
+                          <div className="w-2 h-2 bg-primary rounded-full"></div>
+                        )}
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              </div> */}
+
+              {/* Quick Toggle */}
+              {/* <div className="flex items-center justify-between p-4 bg-muted/50 rounded-lg">
+                <div className="flex items-center space-x-3">
+                  {isDarkMode ? (
+                    <Moon className="w-5 h-5 text-primary" />
+                  ) : (
+                    <Sun className="w-5 h-5 text-primary" />
+                  )}
+                  <div>
+                    <p className="text-sm font-medium text-foreground">Basculer rapidement</p>
+                    <p className="text-xs text-muted-foreground">
+                      Actuellement en mode {isDarkMode ? 'sombre' : 'clair'}
+                    </p>
+                  </div>
+                </div>
+                <button
+                  onClick={toggleTheme}
+                  className="px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors text-sm font-medium"
+                >
+                  Basculer
+                </button>
+              </div> */}
+            {/* </div> */}
+          {/* </div>  */}
+
+          {/* Password Change */}
+          <div className="bg-card rounded-lg border border-border p-6">
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="text-lg font-semibold text-foreground">Sécurité</h2>
+              {!showPasswordForm && (
+                <button
+                  onClick={() => setShowPasswordForm(true)}
+                  className="flex items-center px-3 py-2 text-sm bg-blue-50 text-blue-700 rounded-lg hover:bg-blue-100 transition-colors"
+                  disabled={isSaving}
+                >
+                  <Key className="w-4 h-4 mr-2" />
+                  Changer le mot de passe
+                </button>
+              )}
+            </div>
+
+            {showPasswordForm ? (
+              <form onSubmit={handlePasswordSubmit} className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Ancien mot de passe
+                  </label>
+                  <input
+                    type="password"
+                    value={passwordData.old_password}
+                    onChange={(e) => setPasswordData({...passwordData, old_password: e.target.value})}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-700 focus:border-blue-700"
+                    required
+                    disabled={isSaving}
+                  />
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Nouveau mot de passe
+                  </label>
+                  <input
+                    type="password"
+                    value={passwordData.new_password}
+                    onChange={(e) => setPasswordData({...passwordData, new_password: e.target.value})}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-700 focus:border-blue-700"
+                    required
+                    minLength="6"
+                    disabled={isSaving}
+                  />
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Confirmer le nouveau mot de passe
+                  </label>
+                  <input
+                    type="password"
+                    value={passwordData.confirm_password}
+                    onChange={(e) => setPasswordData({...passwordData, confirm_password: e.target.value})}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-700 focus:border-blue-700"
+                    required
+                    minLength="6"
+                    disabled={isSaving}
+                  />
+                </div>
+                
+                <div className="flex space-x-3 pt-2">
+                  <button
+                    type="submit"
+                    className="px-4 py-2 bg-blue-700 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50"
+                    disabled={isSaving}
+                  >
+                    {isSaving ? 'Changement...' : 'Changer le mot de passe'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowPasswordForm(false);
+                      setPasswordData({
+                        old_password: '',
+                        new_password: '',
+                        confirm_password: ''
+                      });
+                    }}
+                    className="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors"
+                    disabled={isSaving}
+                  >
+                    Annuler
+                  </button>
+                </div>
+              </form>
+            ) : (
+              <div className="flex items-center space-x-3 text-gray-600">
+                <Key className="w-5 h-5" />
+                <p className="text-sm">Cliquez sur le bouton pour changer votre mot de passe</p>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    </ProtectedRoute>
+  );
+}

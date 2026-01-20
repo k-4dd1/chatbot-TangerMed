@@ -1,0 +1,117 @@
+export const MessageUtils = {
+  createUserMessage: (content) => ({
+    id: crypto.randomUUID(),
+    type: "user",
+    content: content.trim(),
+    timestamp: new Date().toISOString(),
+    role: "user",
+  }),
+
+  createBotMessage: (content, id = null) => ({
+    id: id || crypto.randomUUID(),
+    type: "bot",
+    content: content.trim(),
+    timestamp: new Date().toISOString(),
+    role: "assistant",
+  }),
+
+  createTypingMessage: (id = null) => ({
+    id: id || crypto.randomUUID(),
+    type: "bot",
+    content: "",
+    timestamp: new Date().toISOString(),
+    role: "assistant",
+    isTyping: true, // Special flag to identify typing messages
+  }),
+
+  formatTimestamp: (timestamp) => {
+    const date = new Date(timestamp);
+    return date.toLocaleTimeString("fr-FR", {
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+  },
+
+  formatConversationDate: (dateString, caller = 'unknown') => {
+    if (!dateString) return "Date inconnue";
+    
+    const date = new Date(dateString);
+    if (isNaN(date.getTime())) return "Date invalide";
+    
+    const now = new Date();
+    
+    // Calculate the raw difference first
+    let diffTime = now - date;
+    
+    // If the date is in the future or invalid, treat it as current time (diffTime = 0)
+    if (date > now) {
+      diffTime = 0;
+    }
+    
+    // Ensure diffTime is not negative
+    if (diffTime < 0) {
+      diffTime = 0;
+    }
+    
+    const diffMinutes = Math.floor(diffTime / (1000 * 60));
+    const diffHours = Math.floor(diffTime / (1000 * 60 * 60));
+    const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+    
+    // Handle very recent times
+    if (diffMinutes < 1) {
+      return "À l'instant";
+    }
+    if (diffMinutes < 60) {
+      return `Il y a ${diffMinutes} min`;
+    }
+    if (diffHours < 24) {
+      return `Il y a ${diffHours}h`;
+    }
+    
+    // Handle days
+    if (diffDays === 0) return "Aujourd'hui";
+    if (diffDays === 1) return "Hier";
+    if (diffDays <= 7) return `Il y a ${diffDays} jours`;
+    
+    return date.toLocaleDateString('fr-FR', { 
+      day: 'numeric',
+      month: 'short',
+      year: diffDays > 365 ? 'numeric' : undefined
+    });
+  },
+
+  // Helper function to get the last message timestamp from a conversation
+  getLastMessageTimestamp: (conversation) => {
+    if (!conversation) {
+      return null;
+    }
+
+    let timestamp = null;
+    
+    // Try to get timestamp from last message first
+    if (conversation.messages && conversation.messages.length > 0) {
+      const lastMessage = conversation.messages[conversation.messages.length - 1];
+      timestamp = lastMessage.timestamp || lastMessage.created_at;
+    }
+    
+    // Fallback to conversation timestamps
+    if (!timestamp) {
+      timestamp = conversation.updatedAt || conversation.updated_at || conversation.createdAt || conversation.created_at;
+    }
+    
+    // Return null if no valid timestamp found instead of current time
+    if (!timestamp) {
+      return null;
+    }
+    
+    // Validate the timestamp - if it's invalid, return null
+    const date = new Date(timestamp);
+    
+    if (isNaN(date.getTime())) {
+      console.warn('Invalid timestamp detected:', timestamp);
+      return null;
+    }
+    
+    return timestamp;
+  }
+}; 

@@ -1,0 +1,270 @@
+import { API_CONFIG, STORAGE_KEYS } from '../lib/constants/api';
+
+class ApiService {
+  constructor() {
+    this.baseURL = API_CONFIG.BASE_URL;
+  }
+
+  getToken() {
+    if (typeof window === 'undefined') return null;
+    return localStorage.getItem(STORAGE_KEYS.AUTH_TOKEN);
+  }
+
+  setToken(token) {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem(STORAGE_KEYS.AUTH_TOKEN, token);
+    }
+  }
+
+  clearToken() {
+    if (typeof window !== 'undefined') {
+      localStorage.removeItem(STORAGE_KEYS.AUTH_TOKEN);
+    }
+  }
+
+  getAuthHeaders() {
+    const token = this.getToken();
+    return {
+      'Content-Type': API_CONFIG.HEADERS.CONTENT_TYPE,
+      ...(token && { Authorization: `Bearer ${token}` })
+    };
+  }
+
+  async handleResponse(response) {
+    if (response.status === API_CONFIG.STATUS_CODES.UNAUTHORIZED) {
+      this.clearToken();
+      if (typeof window !== 'undefined') {
+        window.location.href = '/login';
+      }
+      throw new Error('Authentication required');
+    }
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(
+        errorData.detail || `HTTP ${response.status}: ${response.statusText}`
+      );
+    }
+
+    const contentType = response.headers.get('content-type');
+    if (contentType && contentType.includes('application/json')) {
+      return await response.json();
+    }
+
+    return await response.text();
+  }
+
+  async request(endpoint, options = {}) {
+    const url = `${this.baseURL}${endpoint}`;
+    
+    const config = {
+      ...options,
+      headers: {
+        ...this.getAuthHeaders(),
+        ...options.headers
+      }
+    };
+
+    try {
+      const response = await fetch(url, config);
+      return await this.handleResponse(response);
+    } catch (error) {
+      console.error(`API Request failed for ${endpoint}:`, error);
+      throw error;
+    }
+  }
+
+  // Auth methods
+  async login(username, password) {
+    try {
+      const loginFormData = new FormData();
+      loginFormData.append('username', username);
+      loginFormData.append('password', password);
+
+      const response = await fetch(`${this.baseURL}${API_CONFIG.ENDPOINTS.AUTH.LOGIN}`, {
+        method: 'POST',
+        body: loginFormData
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        if (data.access_token) {
+          this.setToken(data.access_token);
+          return { success: true, data };
+        }
+      } else {
+        const errorData = await response.json().catch(() => ({}));
+        return {
+          success: false,
+          error: errorData.detail || 'Invalid credentials'
+        };
+      }
+    } catch (error) {
+      console.error('Login error:', error);
+      return {
+        success: false,
+        error: error.message || 'Connection error'
+      };
+    }
+  }
+
+  async getCurrentUser() {
+    try {
+      const userData = await this.request(API_CONFIG.ENDPOINTS.AUTH.ME);
+      return { success: true, data: userData };
+    } catch (error) {
+      return {
+        success: false,
+        error: error.message,
+        shouldRedirect: error.message.includes('Authentication required')
+      };
+    }
+  }
+
+  async updateUser(userData) {
+    try {
+      const result = await this.request(API_CONFIG.ENDPOINTS.AUTH.UPDATE, {
+        method: 'POST',
+        body: JSON.stringify(userData)
+      });
+      return { success: true, data: result };
+    } catch (error) {
+      return {
+        success: false,
+        error: error.message
+      };
+    }
+  }
+
+  // Conversation methods
+  async getConversations() {
+    return this.request(API_CONFIG.ENDPOINTS.CHAT.CONVERSATIONS);
+  }
+
+  async createConversation(title) {
+    return this.request(API_CONFIG.ENDPOINTS.CHAT.CONVERSATIONS, {
+      method: 'POST',
+      body: JSON.stringify({
+        title: title || 'Nouvelle conversation'
+      })
+    });
+  }
+
+  async deleteConversation(id) {
+    return this.request(`${API_CONFIG.ENDPOINTS.CHAT.CONVERSATIONS}/${id}`, {
+      method: 'DELETE'
+    });
+  }
+
+  async getConversationMessages(conversationId) {
+    return this.request(API_CONFIG.ENDPOINTS.CHAT.CONVERSATION_HISTORY(conversationId));
+  }
+
+  async sendMessage(conversationId, message) {
+    return this.request(API_CONFIG.ENDPOINTS.CHAT.CONVERSATION_CHAT(conversationId), {
+      method: 'POST',
+      body: JSON.stringify({
+        message: message.trim()
+      })
+    });
+  }
+
+  async sendStreamingMessage(conversationId, message, onChunk) {
+    try {
+      // Try streaming endpoint first
+      const response = await fetch(
+        `${this.baseURL}${API_CONFIG.ENDPOINTS.CHAT.CONVERSATION_STREAM(conversationId)}`,
+        {
+          method: 'POST',
+          headers: {
+            ...this.getAuthHeaders(),
+            Accept: API_CONFIG.HEADERS.ACCEPT_STREAM,
+            'Cache-Control': API_CONFIG.HEADERS.CACHE_CONTROL,
+            Connection: API_CONFIG.HEADERS.CONNECTION
+          },
+          body: JSON.stringify({
+            message: message.trim()
+          })
+        }
+      );
+
+      if (!response.ok) {
+        // If streaming endpoint doesn't exist (404), fallback to regular endpoint
+        if (response.status === API_CONFIG.STATUS_CODES.NOT_FOUND) {
+          console.log('Streaming endpoint not available, using regular chat with chunked simulation');
+          return await this.simulateStreamingFromRegularAPI(conversationId, message, onChunk);
+        }
+
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(
+          errorData.detail || `HTTP ${response.status}: ${response.statusText}`
+        );
+      }
+
+      if (!response.body) {
+        throw new Error('ReadableStream not supported');
+      }
+
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = '';
+
+      try {
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+
+          buffer += decoder.decode(value, { stream: true });
+          const lines = buffer.split('\n');
+          buffer = lines.pop();
+
+          for (const line of lines) {
+            if (line.startsWith('data: ')) {
+              const data = line.slice(6);
+              if (data === '[DONE]') continue;
+              
+              try {
+                const parsed = JSON.parse(data);
+                if (parsed.content) {
+                  onChunk(parsed.content);
+                }
+              } catch (e) {
+                console.warn('Failed to parse SSE data:', data);
+              }
+            }
+          }
+        }
+      } finally {
+        reader.releaseLock();
+      }
+    } catch (error) {
+      console.error('Streaming error:', error);
+      throw error;
+    }
+  }
+
+  async simulateStreamingFromRegularAPI(conversationId, message, onChunk) {
+    try {
+      const result = await this.sendMessage(conversationId, message);
+      
+      if (result && result.response) {
+        const content = result.response;
+        const words = content.split(' ');
+        
+        for (let i = 0; i < words.length; i++) {
+          const chunk = words.slice(0, i + 1).join(' ');
+          onChunk(chunk);
+          await new Promise(resolve => setTimeout(resolve, 50));
+        }
+      }
+      
+      return result;
+    } catch (error) {
+      console.error('Simulated streaming error:', error);
+      throw error;
+    }
+  }
+}
+
+export const apiService = new ApiService();
+export default apiService; 

@@ -1,0 +1,84 @@
+'use client';
+
+import React, { createContext, useContext, useState, useEffect } from 'react';
+import { ThemeUtils } from '../lib/utils/themeUtils';
+import { COLOR_SCHEME_VALUES, THEME_VALUES } from '../lib/constants/api';
+
+const ThemeContext = createContext();
+
+export const useTheme = () => {
+  const context = useContext(ThemeContext);
+  if (!context) {
+    throw new Error('useTheme must be used within a ThemeProvider');
+  }
+  return context;
+};
+
+export const ThemeProvider = ({ children }) => {
+  const [theme, setTheme] = useState(THEME_VALUES.LIGHT);
+  const [colorScheme, setColorScheme] = useState(COLOR_SCHEME_VALUES.BLUE);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    // Initialize theme and color scheme from localStorage
+    const savedTheme = ThemeUtils.getTheme();
+    const savedColorScheme = ThemeUtils.getColorScheme();
+    
+    setTheme(savedTheme);
+    setColorScheme(savedColorScheme);
+    
+    // Apply theme to HTML element
+    ThemeUtils.applyThemeToHtml(savedTheme, savedColorScheme);
+    
+    setIsLoading(false);
+  }, []);
+
+  const toggleTheme = () => {
+    const newTheme = ThemeUtils.toggleTheme();
+    setTheme(newTheme);
+    ThemeUtils.applyThemeToHtml(newTheme, colorScheme);
+  };
+
+  const changeColorScheme = (newColorScheme) => {
+    ThemeUtils.setColorScheme(newColorScheme);
+    setColorScheme(newColorScheme);
+    ThemeUtils.applyThemeToHtml(theme, newColorScheme);
+  };
+
+  const changeTheme = (newTheme) => {
+    ThemeUtils.setTheme(newTheme);
+    setTheme(newTheme);
+    ThemeUtils.applyThemeToHtml(newTheme, colorScheme);
+  };
+
+  const isDarkMode = theme === THEME_VALUES.DARK;
+
+  if (isLoading) {
+    // Return a minimal loading state with default light theme
+    return <div className="min-h-screen bg-gray-50"></div>;
+  }
+
+  const value = {
+    theme,
+    colorScheme,
+    isDarkMode,
+    toggleTheme,
+    changeTheme,
+    changeColorScheme,
+    setTheme: changeTheme,
+    availableColorSchemes: [
+      { value: COLOR_SCHEME_VALUES.BLUE, label: 'Blue' },
+      { value: COLOR_SCHEME_VALUES.GREEN, label: 'Green' }
+    ],
+    availableThemes: [
+      { value: THEME_VALUES.LIGHT, label: 'Light' },
+      { value: THEME_VALUES.DARK, label: 'Dark' }
+    ]
+  };
+
+  return (
+    <ThemeContext.Provider value={value}>
+      {children}
+    </ThemeContext.Provider>
+  );
+}; 

@@ -1,0 +1,298 @@
+"use client";
+
+import React from "react";
+import { motion, AnimatePresence } from "framer-motion";
+import { Plus, MessageCircle, MoreVertical, User, Settings, X, Trash2, Loader2, LogOut, ChevronLeft, ChevronRight } from "lucide-react";
+import { Button } from "../ui/Button";
+import { cn } from "../../lib/utils";
+import { ConversationItem } from "./ConversationItem";
+import { useRouter } from "next/navigation";
+export function Sidebar({
+  sidebarOpen,
+  setSidebarOpen,
+  conversations,
+  conversationsLoading,
+  selectedConversation,
+  currentConversationId,
+  hoveredConversation,
+  setHoveredConversation,
+  openDropdownId,
+  setOpenDropdownId,
+  user,
+  isDarkMode,
+  startNewConversation,
+  isCreatingConversation,
+  messages,
+  handleConversationSelect,
+  handleDeleteConversation,
+  goToProfile,
+  handleLogout
+}) {
+  const router = useRouter();
+
+  // Calculate width based on screen size
+  const [isMobile, setIsMobile] = React.useState(false);
+  const [windowWidth, setWindowWidth] = React.useState(0);
+  const handleNewConversation = () => {
+    // setTimeout(() => {
+      // }, 100);
+      // set the loading to true
+ 
+      startNewConversation();
+      router.replace('/dashboard');
+  }
+  React.useEffect(() => {
+    const checkScreenSize = () => {
+      if (typeof window !== 'undefined') {
+        const width = window.innerWidth;
+        setWindowWidth(width);
+        setIsMobile(width < 1024);
+      }
+    };
+    
+    // Initial check
+    checkScreenSize();
+    
+    // Add event listener
+    if (typeof window !== 'undefined') {
+      window.addEventListener('resize', checkScreenSize);
+      return () => window.removeEventListener('resize', checkScreenSize);
+    }
+  }, []);
+  
+  const sidebarWidth = React.useMemo(() => {
+    if (!sidebarOpen) return 0;
+    if (typeof window === 'undefined') return 320; // SSR fallback
+    return isMobile ? windowWidth : 320;
+  }, [sidebarOpen, isMobile, windowWidth]);
+
+  return (
+    <>
+      {/* Mobile overlay */}
+      <AnimatePresence>
+        {sidebarOpen && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.3 }}
+            className="fixed inset-0 bg-black/50 z-40 lg:hidden"
+            onClick={() => setSidebarOpen(false)}
+          />
+        )}
+      </AnimatePresence>
+
+    <motion.div
+      initial={false}
+      animate={
+        isMobile 
+          ? { x: sidebarOpen ? 0 : -windowWidth, opacity: sidebarOpen ? 1 : 0 }
+          : { width: sidebarWidth, opacity: sidebarOpen ? 1 : 0 }
+      }
+      transition={{
+        duration: 0.3,
+        ease: "easeInOut"
+      }}
+      className={cn(
+        "flex flex-col overflow-hidden",
+        // Mobile: fixed positioning when open, hidden when closed
+        isMobile && sidebarOpen && "fixed inset-y-0 left-0 z-50 w-full h-full",
+        isMobile && !sidebarOpen && "hidden",
+        // Desktop: relative positioning with border
+        !isMobile && "relative border-r",
+        !isMobile && sidebarOpen && "w-80",
+        !isMobile && !sidebarOpen && "w-0",
+        isDarkMode
+          ? "bg-slate-900 border-slate-700"
+          : "border-gray-200",
+      )}
+      style={!isDarkMode ? { backgroundColor: '#f1f5f9' } : {}}
+    >
+      {/* Sidebar Header */}
+      {sidebarOpen && (
+        <div className={cn(
+          "flex items-center justify-between px-4 py-3 backdrop-blur-sm",
+          isDarkMode
+            ? "border-slate-700 bg-slate-900/50"
+            : "border-gray-200"
+        )}
+          style={!isDarkMode ? { backgroundColor: '#f1f5f9' } : {}}
+        >
+          <p className={cn(
+            "text-sm font-semibold",
+            isDarkMode ? "text-slate-100" : "text-gray-800"
+          )}>
+            Conversations
+          </p>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setSidebarOpen(false)}
+              className="hidden lg:flex hover:bg-transparent focus:ring-0 focus:ring-offset-0 focus:outline-none focus-visible:ring-0"
+              title="Fermer la barre latérale"
+            >
+              <ChevronLeft className="h-4 w-4" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setSidebarOpen(false)}
+              className="lg:hidden hover:bg-transparent focus:ring-0 focus:ring-offset-0 focus:outline-none focus-visible:ring-0"
+            >
+              <X className="h-4 w-4" />
+            </Button>
+          </div>
+        </div>
+      )}
+
+      {/* New Chat Button */}
+      {sidebarOpen && (
+        <div className="absolute mt-10 bg-blue-950 left-0 right-0 glass-effect p-4 z-10">
+          <button
+            onClick={handleNewConversation}
+            disabled={isCreatingConversation}
+            title={
+              isCreatingConversation 
+                ? "Création en cours..." 
+                : "Créer une nouvelle conversation"
+            }
+            className={cn(
+              "w-full flex items-center font-semibold justify-center shadow-sm hover:shadow-md transition-all duration-200 text-white bg-blue-950 rounded-lg px-3 py-[9px]",
+              isDarkMode
+                ? " text-white"
+                : " text-white",
+              isCreatingConversation && "opacity-50 cursor-not-allowed hover:scale-100 hover:bg-blue-950",
+              !isCreatingConversation && "hover:scale-105 hover:bg-blue-900"
+            )}
+          >
+            {/* {isCreatingConversation ? (
+              <>
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                Création...
+              </>
+            ) : (
+              <> */}
+                <Plus className="h-4 w-4 mr-2" />
+                Nouvelle Conversation
+              {/* </> */}
+            {/* )} */}
+          </button>
+        </div>
+      )}
+
+      {/* Conversations List */}
+      {sidebarOpen && (
+        <div className="flex-1 overflow-y-auto custom-scrollbar mt-14">
+          <div className="space-y-2 p-2 pb-24">
+            {conversationsLoading ? (
+            <div className={cn(
+              "flex flex-col items-center justify-center py-8 text-center",
+              isDarkMode ? "text-slate-400" : "text-gray-600"
+            )}>
+              <Loader2 className={cn(
+                "w-6 h-6 animate-spin mb-3",
+                isDarkMode ? "text-slate-400" : "text-gray-600"
+              )} />
+              <p className="text-sm">Chargement des conversations...</p>
+            </div>
+          ) : conversations.length > 0 ? conversations.map((conversation) => (
+            <ConversationItem
+              key={conversation.id}
+              conversation={conversation}
+              selectedConversation={selectedConversation}
+              hoveredConversation={hoveredConversation}
+              setHoveredConversation={setHoveredConversation}
+              openDropdownId={openDropdownId}
+              setOpenDropdownId={setOpenDropdownId}
+              isDarkMode={isDarkMode}
+              handleConversationSelect={handleConversationSelect}
+              handleDeleteConversation={handleDeleteConversation}
+            />
+          )) : (
+            <div className={cn(
+              "flex flex-col items-center justify-center py-8 text-center",
+              isDarkMode ? "text-slate-400" : "text-gray-600"
+            )}>
+              <MessageCircle className={cn(
+                "w-12 h-12 mb-3",
+                isDarkMode ? "text-slate-600" : "text-gray-400"
+              )} />
+              <p className="text-sm font-medium mb-1">Aucune conversation</p>
+              <p className="text-xs">Commencez une nouvelle conversation</p>
+            </div>
+          )}
+        </div>
+      </div>
+      )}
+
+      {/* Sidebar Footer with User Info */}
+      {sidebarOpen && (
+        <div className="absolute bottom-0 left-0 right-0 glass-effect p-4 space-y-3 z-10">
+        {/* <div className={cn(
+          "flex items-center space-x-3 p-3 rounded-xl shadow-sm",
+          isDarkMode
+            ? "bg-slate-900/70 border-slate-600/50 shadow-lg"
+            : "border-gray-300/60 shadow-md"
+        )}
+          style={!isDarkMode ? { backgroundColor: '#f1f5f9', borderColor: 'rgba(148, 163, 184, 0.3)' } : {}}
+        >
+          <div className={cn(
+            "w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0",
+            isDarkMode ? "bg-blue-700" : "bg-primary"
+          )}>
+            <User className={cn(
+              "h-4 w-4",
+              isDarkMode ? "text-white" : "text-primary-foreground"
+            )} />
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className={cn(
+              "text-sm font-medium truncate",
+              isDarkMode ? "text-slate-100" : "text-gray-800"
+            )}>
+              {user?.username || 'Utilisateur'}
+            </p>
+            <p className={cn(
+              "text-xs truncate",
+              isDarkMode ? "text-slate-400" : "text-gray-600"
+            )}>
+              {user?.email || 'user@tangermed.ma'}
+            </p>
+          </div>
+        </div> */}
+        <div className="flex gap-2">
+          <Button
+            variant="ghost"
+            onClick={goToProfile}
+            className={cn(
+              "flex-1 !justify-start !text-left flex items-center",
+              isDarkMode
+                ? "text-slate-400 hover:text-slate-100 hover:bg-slate-800"
+                : "text-gray-600 hover:text-gray-800 hover:bg-gray-200/50"
+            )}
+            style={{ justifyContent: 'flex-start', textAlign: 'left' }}
+          >
+            <User className="h-4 w-4 mr-2 flex-shrink-0" />
+            <span>Profile</span>
+          </Button>
+          <Button
+            variant="ghost"
+            onClick={handleLogout}
+            className={cn(
+              "px-3 flex items-center justify-center ring-red-500 focus:ring-offset-1 focus:ring-1",
+              isDarkMode
+                ? "text-slate-400 hover:text-red-400 hover:bg-slate-800"
+                : "text-gray-600 hover:text-red-600 hover:bg-gray-200/50"
+            )}
+            title="Logout"
+          >
+            <LogOut className="h-4 w-4" />
+          </Button>
+        </div>
+      </div>
+      )}
+    </motion.div>
+    </>
+  );
+} 

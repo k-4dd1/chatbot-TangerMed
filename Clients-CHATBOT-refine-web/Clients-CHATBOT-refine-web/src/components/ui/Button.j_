@@ -1,0 +1,70 @@
+'use client';
+
+import { Loader2 } from 'lucide-react';
+import { useTheme } from '../../contexts/ThemeContext';
+
+export const Button = ({ 
+  children, 
+  variant = 'primary', 
+  size = 'md', 
+  loading = false, 
+  disabled = false, 
+  className = '', 
+  icon,
+  ...props 
+}) => {
+  const { isDarkMode } = useTheme();
+
+  const baseClasses = 'inline-flex items-center justify-center font-semibold transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed';
+
+  const variants = {
+    primary: isDarkMode
+      ? 'bg-blue-700 hover:bg-blue-700 text-white shadow-lg hover:shadow-xl focus:ring-blue-700'
+      : 'bg-blue-700 hover:bg-blue-700 text-white shadow-md hover:shadow-lg focus:ring-blue-700',
+    
+    secondary: isDarkMode
+      ? 'bg-slate-500 hover:bg-slate-600 text-white shadow-md hover:shadow-lg focus:ring-slate-500'
+      : 'bg-slate-400 hover:bg-slate-500 text-white shadow-md hover:shadow-lg focus:ring-slate-500',
+    
+    success: isDarkMode
+      ? 'bg-green-500 hover:bg-green-600 text-white shadow-md hover:shadow-lg focus:ring-green-500'
+      : 'bg-green-400 hover:bg-green-500 text-white shadow-md hover:shadow-lg focus:ring-green-500',
+    
+    danger: isDarkMode
+      ? 'bg-red-500 hover:bg-red-600 text-white shadow-md hover:shadow-lg focus:ring-red-500'
+      : 'bg-red-400 hover:bg-red-500 text-white shadow-md hover:shadow-lg focus:ring-red-500',
+    
+    ghost: isDarkMode
+      ? 'text-slate-300 hover:bg-slate-700/30 focus:ring-slate-500'
+      : 'text-slate-600 focus:ring-slate-500'
+  };
+
+  const sizes = {
+    sm: 'px-3 py-2 text-sm rounded-lg',
+    md: 'px-6 py-3 text-base rounded-xl',
+    lg: 'px-8 py-4 text-lg rounded-2xl'
+  };
+
+  const isDisabled = disabled || loading;
+
+  return (
+    <button
+      className={`
+        ${baseClasses}
+        ${variants[variant] || variants.primary}
+        ${sizes[size] || sizes.md}
+        ${className}
+      `}
+      disabled={isDisabled}
+      {...props}
+    >
+      {loading && (
+        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+      )}
+      {!loading && icon && (
+        <span className="mr-2">{icon}</span>
+      )}
+      {children}
+    </button>
+  );
+}; 

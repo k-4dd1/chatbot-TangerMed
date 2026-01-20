@@ -1,0 +1,53 @@
+import { NextResponse } from 'next/server';
+
+export function middleware(request) {
+  const { pathname } = request.nextUrl;
+  console.log('Middleware called for path:', pathname);
+
+  // Get the token from cookies or headers
+  const token = request.cookies.get('authToken')?.value || 
+                request.headers.get('Authorization')?.replace('Bearer ', '');
+  
+  // Define public routes that don't require authentication
+  const publicRoutes = ['/login', '/signup', '/'];
+  const isPublicRoute = publicRoutes.some(route => pathname.startsWith(route));
+
+  // Define protected routes that require authentication
+  const protectedRoutes = ['/dashboard', '/profile', '/conversations'];
+  const isProtectedRoute = protectedRoutes.some(route => pathname.startsWith(route));
+
+  // If accessing a protected route without a token, redirect to login
+  if (isProtectedRoute && !token) {
+    console.log('Protected route accessed without token, redirecting to login');
+    const loginUrl = new URL('/login', request.url);
+    loginUrl.searchParams.set('redirect', pathname);
+    return NextResponse.redirect(loginUrl);
+  }
+
+  // If accessing login/signup with a valid token, redirect to dashboard
+  if ((pathname.startsWith('/login') || pathname.startsWith('/signup')) && token) {
+    console.log('Authenticated user accessing auth page, redirecting to dashboard');
+    return NextResponse.redirect(new URL('/dashboard', request.url));
+  }
+
+  // For root path with token, redirect to dashboard
+  if (pathname === '/' && token) {
+    console.log('Authenticated user at root, redirecting to dashboard');
+    return NextResponse.redirect(new URL('/dashboard', request.url));
+  }
+
+  // For root path without token, redirect to login
+  if (pathname === '/' && !token) {
+    console.log('Unauthenticated user at root, redirecting to login');
+    return NextResponse.redirect(new URL('/login', request.url));
+  }
+  console.log('No redirection needed, proceeding with request');
+  return NextResponse.next();
+}
+
+export const config = {
+  matcher: [
+    // Match all routes except static files, API routes, assets, and auth routes
+    '/((?!api|_next/static|_next/image|favicon.ico|public/|login|signup|.*\\.png|.*\\.jpg|.*\\.jpeg|.*\\.gif|.*\\.svg|.*\\.ico|.*\\.css|.*\\.js).*)',
+  ],
+};

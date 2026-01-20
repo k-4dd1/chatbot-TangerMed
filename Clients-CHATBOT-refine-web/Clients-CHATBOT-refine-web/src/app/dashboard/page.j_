@@ -1,0 +1,316 @@
+"use client";
+
+import React, { Suspense } from "react";
+import { motion, AnimatePresence } from "framer-motion";
+import { useRouter, useSearchParams } from "next/navigation";
+import { useAuth } from "../../contexts/AuthContext";
+import { useTheme } from "../../contexts/ThemeContext";
+import ProtectedRoute from "../../components/ProtectedRoute";
+import { useDashboard } from "../../hooks/useDashboard";
+import { Sidebar } from "../../components/dashboard/Sidebar";
+import { ChatHeader } from "../../components/dashboard/ChatHeader";
+import { MessagesArea } from "../../components/dashboard/MessagesArea";
+import { MessageInput } from "../../components/dashboard/MessageInput";
+import { DeleteConversationModal } from "../../components/dashboard/DeleteConversationModal";
+import { Loader2 } from "lucide-react";
+import { cn } from "../../lib/utils";
+import { MessageUtils } from "../../lib/utils/messageUtils";
+
+function DashboardContent() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const { user, logout, isLoading: authLoading } = useAuth();
+  const { isDarkMode } = useTheme();
+
+  const {
+    messages,
+    inputMessage,
+    isLoading,
+    isLoadingConversation,
+    isCreatingConversation,
+    conversations,
+    showDropdown,
+    currentConversationId,
+    setInputMessage,
+    sendMessage,
+    handleQuickQuestion,
+    startNewConversation,
+    goToConversations,
+    goToProfile,
+    handleLogout,
+    toggleDropdown,
+    closeDropdown,
+    deleteConversation
+  } = useDashboard(searchParams);
+
+  // Track conversations loading state
+  const [conversationsLoading, setConversationsLoading] = React.useState(true);
+
+  // Reset conversations loading when conversations change
+  React.useEffect(() => {
+    setConversationsLoading(false);
+  }, [conversations]);
+
+  // New state for sidebar
+  const [sidebarOpen, setSidebarOpen] = React.useState(true);
+  const [selectedConversation, setSelectedConversation] = React.useState(null);
+  const [showDeleteModal, setShowDeleteModal] = React.useState(false);
+  const [conversationToDelete, setConversationToDelete] = React.useState(null);
+  const [hoveredConversation, setHoveredConversation] = React.useState(null);
+  const [openDropdownId, setOpenDropdownId] = React.useState(null);
+  const [dropdownPosition, setDropdownPosition] = React.useState({ top: 0, right: 0 });
+  const [localShowDropdown, setLocalShowDropdown] = React.useState(false);
+  const dropdownButtonRef = React.useRef(null);
+
+  // Custom toggle dropdown function that calculates position
+  const handleToggleDropdown = React.useCallback((e) => {
+    if (e) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
+    console.log('Button clicked, localShowDropdown:', localShowDropdown);
+    
+    if (localShowDropdown) {
+      console.log('Closing dropdown');
+      setLocalShowDropdown(false);
+    } else {
+      console.log('Opening dropdown');
+      if (dropdownButtonRef.current) {
+        const rect = dropdownButtonRef.current.getBoundingClientRect();
+        const dropdownWidth = 176; // w-44 = 11rem = 176px
+        
+        // Calculate left position instead of right
+        let left = rect.right - dropdownWidth; // Align right edge of dropdown with right edge of button
+        
+        // Ensure dropdown doesn't go off the left side of the screen
+        if (left < 8) {
+          left = 8;
+        }
+        
+        // Ensure dropdown doesn't go off the right side of the screen
+        if (left + dropdownWidth > window.innerWidth - 8) {
+          left = window.innerWidth - dropdownWidth - 8;
+        }
+        
+        const newPosition = {
+          top: rect.bottom + 8, // 8px spacing
+          left: left,
+          right: window.innerWidth - rect.right // Keep this for reference
+        };
+        
+        setDropdownPosition(newPosition);
+        console.log('Setting dropdown position:', newPosition, 'Window width:', window.innerWidth, 'Button rect:', rect);
+      }
+      setLocalShowDropdown(true);
+    }
+  }, [localShowDropdown]);
+
+  // Close dropdown function
+  const handleCloseDropdown = React.useCallback(() => {
+    console.log('Closing dropdown via handleCloseDropdown');
+    setLocalShowDropdown(false);
+  }, []);
+
+  // Handle click outside to close dropdown
+  React.useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (dropdownButtonRef.current && !dropdownButtonRef.current.contains(event.target)) {
+        console.log('Clicked outside dropdown, closing');
+        setLocalShowDropdown(false);
+      }
+    };
+
+    if (localShowDropdown) {
+      document.addEventListener('mousedown', handleClickOutside);
+      return () => {
+        document.removeEventListener('mousedown', handleClickOutside);
+      };
+    }
+  }, [localShowDropdown]);
+
+  // Update selected conversation when currentConversationId changes
+  React.useEffect(() => {
+    if (currentConversationId) {
+      setSelectedConversation(currentConversationId);
+    } else {
+      setSelectedConversation(null);
+    }
+  }, [currentConversationId]);
+
+  // Reset conversations loading when conversations change
+  React.useEffect(() => {
+    setConversationsLoading(false);
+  }, [conversations]);
+
+  // Format conversations for display with timestamps
+  const displayConversations = React.useMemo(() => 
+    conversations.map(conversation => {
+      const timestampToUse = MessageUtils.getLastMessageTimestamp(conversation);
+      return {
+        ...conversation,
+        timestamp: MessageUtils.formatConversationDate(timestampToUse, 'Dashboard')
+      };
+    }), 
+    [conversations]
+  );
+
+  // Handle conversation selection
+  const handleConversationSelect = React.useCallback((conversationId) => {
+    setSelectedConversation(conversationId);
+    // Navigate to the selected conversation
+    router.push(`/dashboard?conversation=${conversationId}`);
+  }, [router]);
+
+  // Handle conversation deletion
+  const handleDeleteConversation = async (e, conversationId) => {
+    e.stopPropagation(); // Prevent selecting the conversation when clicking delete
+    setConversationToDelete(conversationId);
+    setShowDeleteModal(true);
+    setOpenDropdownId(null); // Close dropdown when opening modal
+  };
+
+  // Confirm deletion
+  const confirmDeleteConversation = async () => {
+    if (conversationToDelete) {
+      const success = await deleteConversation(conversationToDelete);
+      if (!success) {
+        // You could add toast notification here for error handling
+        console.error('Failed to delete conversation');
+      }
+    }
+    setShowDeleteModal(false);
+    setConversationToDelete(null);
+  };
+
+  // Cancel deletion
+  const cancelDeleteConversation = () => {
+    setShowDeleteModal(false);
+    setConversationToDelete(null);
+  };
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    if (inputMessage.trim() && !isLoading) {
+      sendMessage(inputMessage);
+    }
+  };
+
+  const handleSendMessage = () => {
+    if (inputMessage.trim() && !isLoading) {
+      sendMessage(inputMessage);
+    }
+  };
+
+  if (authLoading) {
+    return (
+      <div className={`
+        min-h-screen flex items-center justify-center
+        ${isDarkMode 
+          ? 'bg-gradient-to-br from-slate-950 via-slate-900 to-slate-800' 
+          : 'bg-gradient-to-br from-slate-50 via-white to-blue-50'
+        }
+      `}>
+        <div className="flex flex-col items-center space-y-4">
+          <Loader2 className={`w-8 h-8 animate-spin ${isDarkMode ? 'text-white' : 'text-gray-900'}`} />
+          <p className={`text-lg font-medium ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>
+            Chargement...
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className={cn("flex h-screen", isDarkMode ? "bg-slate-950" : "bg-background")}>
+      {/* Sidebar */}
+      <Sidebar
+        sidebarOpen={sidebarOpen}
+        setSidebarOpen={setSidebarOpen}
+        conversations={displayConversations}
+        conversationsLoading={conversationsLoading}
+        selectedConversation={selectedConversation}
+        currentConversationId={currentConversationId}
+        hoveredConversation={hoveredConversation}
+        setHoveredConversation={setHoveredConversation}
+        openDropdownId={openDropdownId}
+        setOpenDropdownId={setOpenDropdownId}
+        user={user}
+        isDarkMode={isDarkMode}
+        startNewConversation={startNewConversation}
+        isCreatingConversation={isCreatingConversation}
+        messages={messages}
+        handleConversationSelect={handleConversationSelect}
+        handleDeleteConversation={handleDeleteConversation}
+        goToProfile={goToProfile}
+        handleLogout={handleLogout}
+      />
+
+      {/* Main Chat Area */}
+      <div className="flex-1 flex flex-col relative">
+        <ChatHeader
+          sidebarOpen={sidebarOpen}
+          setSidebarOpen={setSidebarOpen}
+          user={user}
+          isDarkMode={isDarkMode}
+          localShowDropdown={localShowDropdown}
+          dropdownPosition={dropdownPosition}
+          dropdownButtonRef={dropdownButtonRef}
+          handleToggleDropdown={handleToggleDropdown}
+          handleCloseDropdown={handleCloseDropdown}
+          goToProfile={goToProfile}
+          handleLogout={handleLogout}
+        />
+
+        <MessagesArea
+          messages={messages}
+          isLoading={isLoading}
+          isLoadingConversation={isLoadingConversation}
+          isDarkMode={isDarkMode}
+          handleQuickQuestion={handleQuickQuestion}
+        />
+
+        <MessageInput
+          inputMessage={inputMessage}
+          setInputMessage={setInputMessage}
+          isLoading={isLoading}
+          isDarkMode={isDarkMode}
+          handleSubmit={handleSubmit}
+          handleSendMessage={handleSendMessage}
+          handleQuickQuestion={handleQuickQuestion}
+          messages={messages}
+        />
+      </div>
+
+      {/* Delete Confirmation Modal */}
+      <DeleteConversationModal
+        showDeleteModal={showDeleteModal}
+        isDarkMode={isDarkMode}
+        cancelDeleteConversation={cancelDeleteConversation}
+        confirmDeleteConversation={confirmDeleteConversation}
+      />
+
+      {/* Overlay for conversation dropdown menu */}
+      <AnimatePresence>
+        {openDropdownId && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-40"
+            onClick={() => setOpenDropdownId(null)}
+          />
+        )}
+      </AnimatePresence>
+    </div>
+  );
+}
+
+export default function DashboardPage() {
+  return (
+    <ProtectedRoute>
+      <Suspense fallback={<div>Loading...</div>}>
+        <DashboardContent />
+      </Suspense>
+    </ProtectedRoute>
+  );
+}

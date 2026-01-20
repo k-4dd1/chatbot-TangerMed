@@ -1,0 +1,46 @@
+export const API_CONFIG = {
+  BASE_URL: process.env.NEXT_PUBLIC_API_BASE_URL,
+  ENDPOINTS: {
+    AUTH: {
+      LOGIN: '/auth/token',
+      REGISTER: '/auth/register', 
+      ME: '/auth/me',
+      UPDATE: '/auth/update'
+    },
+    CHAT: {
+      CONVERSATIONS: '/chatsystem/conversations',
+      CONVERSATION_HISTORY: (id) => `/chatsystem/conversations/${id}/history`,
+      CONVERSATION_CHAT: (id) => `/chatsystem/conversations/${id}/chat`,
+      CONVERSATION_STREAM: (id) => `/chatsystem/conversations/${id}/chat-stream`
+    }
+  },
+  HEADERS: {
+    CONTENT_TYPE: 'application/json',
+    ACCEPT_STREAM: 'text/event-stream',
+    CACHE_CONTROL: 'no-cache',
+    CONNECTION: 'keep-alive'
+  },
+  STATUS_CODES: {
+    OK: 200,
+    UNAUTHORIZED: 401,
+    NOT_FOUND: 404,
+    SERVER_ERROR: 500
+  }
+};
+
+export const STORAGE_KEYS = {
+  AUTH_TOKEN: 'authToken',
+  CONVERSATIONS: 'conversations',
+  THEME: 'theme',
+  COLOR_SCHEME: 'colorScheme'
+};
+
+export const THEME_VALUES = {
+  DARK: 'dark',
+  LIGHT: 'light'
+};
+
+export const COLOR_SCHEME_VALUES = {
+  BLUE: 'blue',
+  GREEN: 'green'
+}; 

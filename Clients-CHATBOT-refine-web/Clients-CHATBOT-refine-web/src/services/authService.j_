@@ -1,0 +1,263 @@
+import apiService from './api';
+
+class AuthService {
+  constructor() {
+    this.tokenKey = 'authToken';
+  }
+
+  storeToken(token) {
+    apiService.setToken(token);
+    // Also store in cookie for server-side access
+    if (typeof window !== 'undefined') {
+      document.cookie = `authToken=${token}; path=/; max-age=${7 * 24 * 60 * 60}; samesite=strict`;
+    }
+  }
+
+  getToken() {
+    return apiService.getToken();
+  }
+
+  clearToken() {
+    apiService.clearToken();
+    // Also clear the cookie
+    if (typeof window !== 'undefined') {
+      document.cookie = 'authToken=; path=/; expires=Thu, 01 Jan 1970 00:00:00 UTC; samesite=strict';
+    }
+  }
+
+  isAuthenticated() {
+    return !!this.getToken();
+  }
+
+  async login(username, password) {
+    try {
+      // The original service uses FormData for login, so we need to handle this differently
+      const loginFormData = new FormData();
+      loginFormData.append('username', username);
+      loginFormData.append('password', password);
+
+      const response = await fetch(`${apiService.baseURL}/auth/token`, {
+        method: 'POST',
+        body: loginFormData
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        this.storeToken(data.access_token);
+        
+        return {
+          success: true,
+          data: data,
+          token: data.access_token
+        };
+      } else {
+        const errorData = await response.json().catch(() => ({}));
+        const errorMessage = errorData.detail || 'Identifiants incorrects';
+        
+        return {
+          success: false,
+          error: errorMessage
+        };
+      }
+    } catch (error) {
+      console.error('Login error:', error);
+      
+      return {
+        success: false,
+        error: error.message || 'Erreur de connexion'
+      };
+    }
+  }
+
+  async getCurrentUser() {
+    try {
+      const result = await apiService.getCurrentUser();
+      
+      if (!result.success && result.shouldRedirect) {
+        this.handleAuthExpiry();
+      }
+      
+      return result;
+    } catch (error) {
+      console.error('Get user error:', error);
+      
+      return {
+        success: false,
+        error: error.message || 'Network error occurred'
+      };
+    }
+  }
+
+  async updateUser(userData) {
+    try {
+      const token = this.getToken();
+      if (!token) {
+        return {
+          success: false,
+          error: 'No authentication token'
+        };
+      }
+
+      const response = await fetch(`${apiService.baseURL}/auth/me`, {
+        method: 'PUT',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(userData)
+      });
+
+      if (response.ok) {
+        const updatedUser = await response.json();
+        
+        return {
+          success: true,
+          data: updatedUser
+        };
+      } else {
+        if (response.status === 401) {
+          this.clearToken();
+          this.handleAuthExpiry();
+          return {
+            success: false,
+            error: 'Authentication expired. Please login again.',
+            status: 401,
+            shouldRedirect: true
+          };
+        }
+        
+        const errorData = await response.json().catch(() => ({}));
+        const errorMessage = errorData.detail || `Update failed: ${response.status}`;
+        
+        return {
+          success: false,
+          error: errorMessage,
+          status: response.status
+        };
+      }
+    } catch (error) {
+      console.error('Update user error:', error);
+      
+      return {
+        success: false,
+        error: error.message || 'Network error occurred'
+      };
+    }
+  }
+
+  async changePassword(oldPassword, newPassword) {
+    try {
+      const token = this.getToken();
+      if (!token) {
+        return {
+          success: false,
+          error: 'No authentication token'
+        };
+      }
+
+      const response = await fetch(`${apiService.baseURL}/auth/password`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          old_password: oldPassword,
+          new_password: newPassword
+        })
+      });
+
+      if (response.ok) {
+        const result = await response.text();
+        
+        return {
+          success: true,
+          message: result || 'Password changed successfully'
+        };
+      } else {
+        if (response.status === 401) {
+          this.clearToken();
+          this.handleAuthExpiry();
+          return {
+            success: false,
+            error: 'Authentication expired. Please login again.',
+            status: 401,
+            shouldRedirect: true
+          };
+        }
+        
+        const errorData = await response.json().catch(() => ({}));
+        const errorMessage = errorData.detail || `Password change failed: ${response.status}`;
+        
+        return {
+          success: false,
+          error: errorMessage,
+          status: response.status
+        };
+      }
+    } catch (error) {
+      console.error('Change password error:', error);
+      
+      return {
+        success: false,
+        error: error.message || 'Network error occurred'
+      };
+    }
+  }
+
+  handleAuthExpiry() {
+    setTimeout(() => {
+      if (typeof window !== 'undefined') {
+        window.location.href = '/web/login?reason=session_expired';
+      }
+    }, 2500);
+  }
+
+  logout() {
+    this.clearToken();
+    
+    setTimeout(() => {
+      if (typeof window !== 'undefined') {
+        window.location.href = '/web/login';
+      }
+    }, 1000);
+  }
+
+  async verifyToken() {
+    const userResult = await this.getCurrentUser();
+    return userResult.success;
+  }
+
+  getApiHeaders() {
+    return apiService.getAuthHeaders();
+  }
+
+  isTokenExpired() {
+    const token = this.getToken();
+    if (!token) return true;
+    
+    return false;
+  }
+
+  // Sync localStorage token with cookies (call on app initialization)
+  syncTokenWithCookies() {
+    if (typeof window !== 'undefined') {
+      const token = this.getToken();
+      if (token) {
+        // Ensure cookie is set if localStorage has token
+        document.cookie = `authToken=${token}; path=/; max-age=${7 * 24 * 60 * 60}; samesite=strict`;
+      }
+    }
+  }
+
+  // Get redirect URL from query params
+  getRedirectUrl() {
+    if (typeof window !== 'undefined') {
+      const urlParams = new URLSearchParams(window.location.search);
+      return urlParams.get('redirect') || '/dashboard';
+    }
+    return '/dashboard';
+  }
+}
+
+export default new AuthService();

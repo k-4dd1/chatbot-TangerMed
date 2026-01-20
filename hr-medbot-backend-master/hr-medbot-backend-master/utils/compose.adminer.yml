@@ -1,0 +1,26 @@
+# ---------------------------------------------------------------------------
+# Adminer Database Management Tool
+# ---------------------------------------------------------------------------
+# This Docker Compose file spins up Adminer, a web-based database management
+# tool, for debugging and inspecting the database during development.
+#
+# Usage:
+#  ADMINER_PORT=13337 docker compose -f utils/compose.adminer.yml up -d
+#
+# Access Adminer at: http://localhost:${ADMINER_PORT:-13337}
+# ---------------------------------------------------------------------------
+
+services:
+  adminer:
+    image: adminer
+    ports:
+      - ${ADMINER_PORT:-13337}:8080
+    environment:
+      - ADMINER_DESIGN=dracula
+      - ADMINER_HOST=database
+    networks:
+      - tangermed-chatbot-network
+
+networks:
+  tangermed-chatbot-network:
+    external: true

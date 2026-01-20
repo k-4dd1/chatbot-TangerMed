@@ -1,0 +1,195 @@
+"use client";
+
+import React, { useRef, useEffect } from "react";
+import { motion } from "framer-motion";
+import { Bot, User, Loader2 } from "lucide-react";
+import { WelcomeCard } from "./WelcomeCard";
+import { MarkdownRenderer } from "../ui/MarkdownRenderer";
+import { cn } from "../../lib/utils";
+import Image from "next/image";
+const fixMarkdownLists = (content) => {
+  if (!content) return "";
+  // Regex to find a hyphen/asterisk, followed by optional whitespace, then a newline.
+  // It replaces the newline with a single space to join the bullet and text.
+  // const correctedContent = content.replace(/([-*])\s*\n/g, '$1 ');
+  // console.log(`before: ${content}`);
+  // console.log(`after: ${correctedContent}`);
+  const correctedContent = content.replace(/\n{3,}/g, '\n\n');
+  return correctedContent;
+};
+export function MessagesArea({
+  messages,
+  isLoading,
+  isLoadingConversation,
+  isDarkMode,
+  handleQuickQuestion
+}) {
+  const messagesEndRef = useRef(null);
+  const messagesContainerRef = useRef(null);
+
+  // Instantly position at bottom when messages change
+  const scrollToBottom = () => {
+    if (messagesContainerRef.current) {
+      messagesContainerRef.current.scrollTop = messagesContainerRef.current.scrollHeight;
+    }
+  };
+
+  // Instantly position at bottom when messages change or loading states change
+  useEffect(() => {
+    scrollToBottom();
+  }, [messages, isLoading]);
+
+  // Also position at bottom when component first mounts with messages
+  useEffect(() => {
+    if (messages.length > 0) {
+      scrollToBottom();
+    }
+  }, []);
+
+  if (isLoadingConversation) {
+    return (
+      <div className={cn(
+        "flex-1 overflow-y-auto p-6 space-y-6",
+        isDarkMode 
+          ? "bg-gradient-to-b from-slate-950 to-slate-900" 
+          : "bg-gradient-to-b from-background to-muted/20"
+      )}>
+        <div className="flex justify-center items-center py-16">
+          <div className="flex flex-col items-center space-y-4">
+            <Loader2 className={cn(
+              "w-8 h-8 animate-spin",
+              isDarkMode ? 'text-white' : 'text-gray-900'
+            )} />
+            <p className={cn(
+              "text-lg font-medium",
+              isDarkMode ? 'text-gray-300' : 'text-gray-700'
+            )}>
+              Chargement de la conversation...
+            </p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div 
+      ref={messagesContainerRef}
+      className={cn(
+        "flex-1 overflow-y-auto custom-scrollbar p-6 space-y-6 pb-32",
+        isDarkMode 
+          ? "bg-gradient-to-b from-slate-950 to-slate-900" 
+          : "bg-gradient-to-b from-background to-muted/20"
+      )}
+    >
+      {messages.length === 0 ? (
+        <div className="space-y-6">
+          <motion.div
+            initial={{ opacity: 0, y: 30, scale: 0.95 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            transition={{ type: "spring", stiffness: 400, damping: 25, duration: 0.6 }}
+          >
+            <WelcomeCard />
+          </motion.div>
+        </div>
+      ) : (
+        <div className="space-y-6">
+          {messages.map((message, index) => (
+            <motion.div
+              key={message.id}
+              initial={{ opacity: 0, y: 30, scale: 0.9, rotateX: 10 }}
+              animate={{ opacity: 1, y: 0, scale: 1, rotateX: 0 }}
+              transition={{ type: "spring", stiffness: 400, damping: 25, duration: 0.5 }}
+              className={cn("flex", message.type === 'user' ? "justify-end" : "justify-start")}
+            >
+              <div className="flex items-start space-x-3 max-w-xs lg:max-w-2xl">
+                {message.type === 'bot' && (
+                  <div 
+                    className="w-8 h-8 rounded-xl bg-white flex items-center justify-center flex-shrink-0 mt-1 shadow-sm"
+                    
+                  >
+                    {/* <Bot className={cn(
+                      "w-4 h-4",
+                      isDarkMode ? "text-white" : "text-white"
+                    )} /> */}
+                    <img 
+                    src="assets/tmsa.png" 
+                    alt="logo" 
+                    width={32}
+                    height={32}
+                    className="w-32 "
+                  />
+                  </div>
+                )}
+                <div
+                  className={cn(
+                    "px-4 py-3 rounded-2xl shadow-sm transition-all duration-200 hover:shadow-md",
+                    message.type === 'user'
+                      ? isDarkMode
+                        ? "bg-slate-100 text-white ml-auto"
+                        : "bg-slate-100 text-black ml-auto"
+                      : isDarkMode
+                        ? "bg-slate-500 text-slate-100 border border-slate-600"
+                        : "bg-slate-100 text-slate-800 border border-slate-200",
+                  )}
+                >
+                  {message.isTyping ? (
+                    // Typing indicator with animated dots
+                    <div className="flex items-center space-x-1 py-1">
+                      <div className="flex space-x-1">
+                        <div className="w-2 h-2 bg-blue-700 rounded-full animate-bounce"></div>
+                        <div className="w-2 h-2 bg-blue-700 rounded-full animate-bounce" style={{animationDelay: '0.1s'}}></div>
+                        <div className="w-2 h-2 bg-blue-700 rounded-full animate-bounce" style={{animationDelay: '0.2s'}}></div>
+                      </div>
+                      <span className={cn(
+                        "text-xs ml-2",
+                        isDarkMode ? "text-slate-300" : "text-slate-600"
+                      )}>
+                        En train d'écrire...
+                      </span>
+                    </div>
+                  ) : (
+                    <>
+                      {message.type === 'bot' ? (
+                        <MarkdownRenderer 
+                        // --- APPLY THE FIX HERE ---
+                        content={fixMarkdownLists(message.content)} 
+                        isDarkMode={isDarkMode}
+                      />
+                      ) : (
+                        <p className="text-sm leading-relaxed">{message.content}</p>
+                      )}
+                      <p className={cn(
+                        "text-xs mt-2",
+                        message.type === 'user' 
+                          ? isDarkMode ? "text-slate-300" : "text-slate-600"
+                          : isDarkMode ? "text-slate-300" : "text-slate-600"
+                      )}>
+                        {new Date(message.timestamp).toLocaleTimeString("fr-FR", {
+                          hour: "2-digit",
+                          minute: "2-digit",
+                        })}
+                      </p>
+                    </>
+                  )}
+                </div>
+                {message.type === 'user' && (
+                  <div className={cn(
+                    "w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0 mt-1",
+                    isDarkMode ? "bg-slate-700" : "bg-accent/20"
+                  )}>
+                    <User className={cn(
+                      "h-4 w-4",
+                      isDarkMode ? "text-slate-300" : "text-blue-700"
+                    )} />
+                  </div>
+                )}
+              </div>
+            </motion.div>
+          ))}
+
+        </div>
+      )}
+    </div>
+  );
+} 

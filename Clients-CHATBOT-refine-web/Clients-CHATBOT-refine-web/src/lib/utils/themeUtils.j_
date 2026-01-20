@@ -1,0 +1,51 @@
+import { STORAGE_KEYS, THEME_VALUES, COLOR_SCHEME_VALUES } from '../constants/api';
+
+export const ThemeUtils = {
+  getTheme: () => {
+    if (typeof window === 'undefined') return THEME_VALUES.LIGHT;
+    return localStorage.getItem(STORAGE_KEYS.THEME) || THEME_VALUES.LIGHT;
+  },
+
+  setTheme: (theme) => {
+    if (typeof window === 'undefined') return;
+    localStorage.setItem(STORAGE_KEYS.THEME, theme);
+  },
+
+  getColorScheme: () => {
+    if (typeof window === 'undefined') return COLOR_SCHEME_VALUES.BLUE;
+    return localStorage.getItem(STORAGE_KEYS.COLOR_SCHEME) || COLOR_SCHEME_VALUES.BLUE;
+  },
+
+  setColorScheme: (colorScheme) => {
+    if (typeof window === 'undefined') return;
+    localStorage.setItem(STORAGE_KEYS.COLOR_SCHEME, colorScheme);
+  },
+
+  toggleTheme: () => {
+    const currentTheme = ThemeUtils.getTheme();
+    const newTheme = currentTheme === THEME_VALUES.DARK ? THEME_VALUES.LIGHT : THEME_VALUES.DARK;
+    ThemeUtils.setTheme(newTheme);
+    return newTheme;
+  },
+
+  isDarkMode: () => {
+    return ThemeUtils.getTheme() === THEME_VALUES.DARK;
+  },
+
+  applyThemeToHtml: (theme, colorScheme) => {
+    if (typeof window === 'undefined') return;
+    
+    const html = document.documentElement;
+    
+    // Remove existing theme classes
+    html.classList.remove('dark', 'light', 'theme-blue', 'theme-green');
+    
+    // Apply new theme classes
+    html.classList.add(theme);
+    html.classList.add(`theme-${colorScheme}`);
+  },
+
+  getThemeClasses: (theme, colorScheme) => {
+    return `${theme} theme-${colorScheme}`;
+  }
+}; 

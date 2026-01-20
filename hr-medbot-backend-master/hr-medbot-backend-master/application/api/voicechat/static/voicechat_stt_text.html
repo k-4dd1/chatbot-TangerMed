@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Voice Chat (STT → Chat)</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap');
+    html,body{height:100%;margin:0;font-family:'Inter',sans-serif;background:#f7f7f9;display:flex;justify-content:center;align-items:center;color:#222}
+    .wrapper{background:#fff;padding:36px 48px;border-radius:12px;box-shadow:0 6px 14px rgba(0,0,0,0.1);width:420px;max-width:90vw}
+    h1{margin-top:0;text-align:center;font-size:1.6rem}
+    .box{border:1px solid #ddd;border-radius:8px;padding:12px;height:140px;overflow:auto;font-size:.95rem;white-space:pre-wrap}
+    #recordBtn{display:block;width:100%;padding:12px;margin-top:24px;font-size:1rem;border:none;border-radius:8px;background:#4caf50;color:#fff;cursor:pointer;transition:background .2s}
+    #recordBtn.rec{background:#d32f2f}
+    #recordBtn:disabled{background:#bbb;cursor:not-allowed}
+    #status{margin-top:12px;text-align:center;font-size:.9rem;color:#777}
+  </style>
+</head>
+<body>
+  <!-- Login card -->
+  <div class="wrapper" id="login-card" style="display:none;max-width:320px">
+    <h1 style="font-size:1.4rem">Login</h1>
+    <input id="login-username" placeholder="Username" style="width:100%;padding:8px;margin-bottom:12px;"/>
+    <input id="login-password" type="password" placeholder="Password" style="width:100%;padding:8px;margin-bottom:16px;"/>
+    <button id="login-btn" style="width:100%;">Login</button>
+    <div id="login-error" style="color:#d32f2f;margin-top:12px;display:none;"></div>
+  </div>
+
+  <!-- Chat card -->
+  <div class="wrapper" id="chat-card" style="display:none;">
+    <h1>Voice Chat (STT → Text)</h1>
+    <div id="transcription" class="box" placeholder="Transcription will appear here..."></div>
+    <div id="assistant" class="box" style="margin-top:12px" placeholder="Assistant response will appear here..."></div>
+    <button id="recordBtn">Hold SPACE or click to talk</button>
+    <div id="status">Idle</div>
+  </div>
+
+<script>
+const AUTH_TOKEN_KEY="access_token";
+// Helper function to prefix URLs with PROXY_PREFIX
+function prefixUrl(url){
+  const prefix=window.PROXY_PREFIX||"";
+  if(!prefix)return url;
+  if(url.startsWith("/")){return prefix+url;}
+  if(url.startsWith("./")){
+    const currentPath=window.location.pathname;
+    const basePath=currentPath.substring(0,currentPath.lastIndexOf("/"));
+    return prefix+basePath+url.substring(1);
+  }
+  return prefix+"/"+url;
+}
+
+async function login(username,password){
+  const resp=await fetch(prefixUrl('/auth/token'),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({username,password})});
+  if(!resp.ok) throw new Error('Invalid credentials');
+  return (await resp.json()).access_token;
+}
+
+async function verifyToken(tok){
+  if(!tok) return false;
+  try{const resp=await fetch(prefixUrl('/auth/me'),{headers:{Authorization:`Bearer ${tok}`}});return resp.ok;}catch{return false;}
+}
+
+function showLogin(){document.getElementById('login-card').style.display='block';document.getElementById('chat-card').style.display='none';}
+function hideLogin(){document.getElementById('login-card').style.display='none';document.getElementById('chat-card').style.display='block';}
+
+async function bootstrap(){
+  const stored=localStorage.getItem(AUTH_TOKEN_KEY);
+  if(stored && await verifyToken(stored)){
+    hideLogin();
+    initChat(stored);
+  }else{
+    localStorage.removeItem(AUTH_TOKEN_KEY);
+    showLogin();
+  }
+
+  document.getElementById('login-btn').addEventListener('click',async()=>{
+    const u=document.getElementById('login-username').value.trim();
+    const p=document.getElementById('login-password').value;
+    const err=document.getElementById('login-error');err.style.display='none';
+    if(!u||!p){err.textContent='Username & password required';err.style.display='block';return;}
+    try{
+      const tok=await login(u,p);localStorage.setItem(AUTH_TOKEN_KEY,tok);hideLogin();initChat(tok);
+    }catch(e){err.textContent=e.message||'Login failed';err.style.display='block';}
+  });
+}
+
+async function initChat(authToken){
+  const headers={Authorization:`Bearer ${authToken}`};
+
+  // Helpers ------------------------------------------------------------
+  function setStatus(msg){document.getElementById('status').textContent=msg}
+  const transEl=document.getElementById('transcription');
+  const assistEl=document.getElementById('assistant');
+  const recordBtn=document.getElementById('recordBtn');
+
+  // Acquire or create conversation id ---------------------------------
+  let conversationId=sessionStorage.getItem('conv_id');
+  if(!conversationId){
+    // try list conversations
+    let resp=await fetch(prefixUrl('/chatsystem/conversations'),{headers});
+    if(resp.ok){const list=await resp.json();if(list.length)conversationId=list[0].id;}
+    if(!conversationId){resp=await fetch(prefixUrl('/chatsystem/conversations'),{method:'POST',headers});conversationId=(await resp.json()).id;}
+    sessionStorage.setItem('conv_id',conversationId);
+  }
+
+  const ctx=new (window.AudioContext||window.webkitAudioContext)();
+  const stream=await navigator.mediaDevices.getUserMedia({audio:true});
+  const source=ctx.createMediaStreamSource(stream);
+  const processor=ctx.createScriptProcessor(4096,1,1);
+  source.connect(processor);processor.connect(ctx.destination);
+
+  let buffers=[];let recording=false;
+  processor.onaudioprocess=e=>{if(!recording)return;buffers.push(new Float32Array(e.inputBuffer.getChannelData(0)))}
+
+  function encodeWav(buffers,sampleRate){const len=buffers.reduce((a,b)=>a+b.length,0);const buf=new ArrayBuffer(44+len*2);const v=new DataView(buf);
+    function w(o,s){for(let i=0;i<s.length;i++)v.setUint8(o+i,s.charCodeAt(i))}
+    w(0,'RIFF');v.setUint32(4,36+len*2,true);w(8,'WAVE');w(12,'fmt ');
+    v.setUint32(16,16,true);v.setUint16(20,1,true);v.setUint16(22,1,true);
+    v.setUint32(24,sampleRate,true);v.setUint32(28,sampleRate*2,true);
+    v.setUint16(32,2,true);v.setUint16(34,16,true);w(36,'data');v.setUint32(40,len*2,true);
+    let o=44;buffers.forEach(ch=>{for(let i=0;i<ch.length;i++){const s=Math.max(-1,Math.min(1,ch[i]));v.setInt16(o,s<0?s*0x8000:s*0x7FFF,true);o+=2}});
+    return new Blob([buf],{type:'audio/wav'})}
+
+  async function sendAudio(blob){
+    if(!conversationId){setStatus('No conversation');return;}
+    setStatus('Uploading...');recordBtn.disabled=true;
+    const fd=new FormData();fd.append('audio_file',blob,'audio.wav');
+    const resp=await fetch(prefixUrl(`/voicechat/conversation/${conversationId}/stt-text?stream=true`),{method:'POST',body:fd,headers:headers});
+    if(!resp.ok){setStatus('Error');recordBtn.disabled=false;return;}
+    setStatus('Listening...');
+    const reader=resp.body.getReader();let text='';let phase='trans';
+    while(true){const {value,done}=await reader.read();if(done)break;const chunk=new TextDecoder().decode(value);
+      if(phase==='trans'){
+        text+=chunk;
+        const split=text.indexOf("\n\n");
+        if(split!==-1){
+          // Fill transcription box
+          transEl.textContent=text.slice(0,split).trim();
+          // Anything after the delimiter is first assistant chunk
+          const remainder=text.slice(split+2).replace(/\n/g,"");
+          if(remainder){assistEl.textContent+=remainder;assistEl.scrollTop=assistEl.scrollHeight;}
+          phase='assist';
+          text='';
+        }
+      }else{
+        assistEl.textContent+=chunk.replace(/\n/g,"");
+        assistEl.scrollTop=assistEl.scrollHeight;
+      }
+    }
+    setStatus('Idle');recordBtn.disabled=false;
+  }
+
+  // Controls -----------------------------------------------------------
+  function startRec(){buffers=[];recording=true;recordBtn.classList.add('rec');setStatus('Recording...')}
+  async function stopRec(){recording=false;recordBtn.classList.remove('rec');setStatus('Encoding...');
+    const wav=encodeWav(buffers,ctx.sampleRate);await sendAudio(wav)}
+
+  recordBtn.addEventListener('mousedown',startRec);recordBtn.addEventListener('mouseup',stopRec);
+  window.addEventListener('keydown',e=>{if(e.code==='Space'&&!recording){startRec();e.preventDefault();}});
+  window.addEventListener('keyup',e=>{if(e.code==='Space'&&recording){stopRec();e.preventDefault();}});
+}
+
+bootstrap();
+</script>
+</body>
+</html>

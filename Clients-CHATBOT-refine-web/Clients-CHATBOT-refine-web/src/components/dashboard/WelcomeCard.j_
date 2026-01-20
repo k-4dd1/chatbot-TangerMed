@@ -1,0 +1,63 @@
+'use client';
+
+import { Bot, MessageCircle } from 'lucide-react';
+import { motion } from 'framer-motion';
+import { useTheme } from '../../contexts/ThemeContext';
+import { Button } from '../ui/Button';
+import Image from 'next/image';
+import tmsaLogo from '../../../public/assets/tmsa.png';
+const BotAvatar = ({ size = "w-12 h-12" }) => (
+  <div
+    className={`${size} bg-blue-700 rounded-2xl flex items-center justify-center flex-shrink-0`}
+  >
+    <Bot className="w-7 h-7 text-white drop-shadow-sm" />
+  </div>
+);
+
+export const WelcomeCard = () => {
+  const { isDarkMode } = useTheme();
+
+  return (
+    <div className="max-w-lg mx-auto">
+      <motion.div 
+        initial={{ opacity: 0, y: 20 }} 
+        animate={{ opacity: 1, y: 0 }} 
+        transition={{ duration: 0.3 }}
+      >
+        <div className={`
+          rounded-2xl   p-6
+          ${isDarkMode 
+            ? 'border-blue-800 bg-slate-900' 
+            : ' bg-white'
+          }
+        `}>
+          <div className="text-center space-y-4">
+            <div className="flex flex-col items-center gap-3">
+              {/* <BotAvatar /> */}
+              <Image src={tmsaLogo} alt="TangerMed Bot" width={100} height={100} />
+              <div>
+                <h1 className={`
+                  text-xl font-semibold
+                  ${isDarkMode ? 'text-slate-100' : 'text-slate-900'}
+                `}>
+                  Bienvenue sur TangerMed Bot
+                </h1>
+                <p className={`
+                  text-sm mt-1
+                  ${isDarkMode ? 'text-slate-400' : 'text-slate-600'}
+                `}>
+                  Je suis là pour vous aider avec vos questions et tâches
+                </p>
+              </div>
+            </div>
+
+            {/* <Button variant="primary" size="sm">
+              <MessageCircle className="h-4 w-4 mr-2" />
+              Commencer la conversation
+            </Button> */}
+          </div>
+        </div>
+      </motion.div>
+    </div>
+  );
+};

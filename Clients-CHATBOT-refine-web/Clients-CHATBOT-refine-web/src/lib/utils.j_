@@ -1,0 +1,35 @@
+/**
+ * Utility function to combine class names conditionally
+ * @param {...*} classes - Class names to combine
+ * @returns {string} Combined class names
+ */
+export function cn(...classes) {
+  return classes.filter(Boolean).join(' ');
+}
+
+/**
+ * Clamps a number between a minimum and maximum value
+ * @param {number} value - The value to clamp
+ * @param {number} min - The minimum value
+ * @param {number} max - The maximum value
+ * @returns {number} The clamped value
+ */
+export function clamp(value, min, max) {
+  return Math.min(Math.max(value, min), max);
+}
+
+/**
+ * Formats a date to a readable string
+ * @param {Date|string} date - The date to format
+ * @returns {string} Formatted date string
+ */
+export function formatDate(date) {
+  const dateObj = new Date(date);
+  const now = new Date();
+  const diffInHours = Math.floor((now.getTime() - dateObj.getTime()) / (1000 * 60 * 60));
+
+  if (diffInHours < 1) return "À l'instant";
+  if (diffInHours < 24) return `Il y a ${diffInHours}h`;
+  if (diffInHours < 48) return "Hier";
+  return dateObj.toLocaleDateString("fr-FR");
+}

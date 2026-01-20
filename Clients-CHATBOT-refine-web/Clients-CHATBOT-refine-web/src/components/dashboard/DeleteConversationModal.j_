@@ -1,0 +1,106 @@
+"use client";
+
+import React from "react";
+import { motion, AnimatePresence } from "framer-motion";
+import { Trash2 } from "lucide-react";
+import { cn } from "../../lib/utils";
+
+export function DeleteConversationModal({
+  showDeleteModal,
+  isDarkMode,
+  cancelDeleteConversation,
+  confirmDeleteConversation
+}) {
+  return (
+    <AnimatePresence>
+      {showDeleteModal && (
+        <>
+          {/* Backdrop */}
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50"
+            onClick={cancelDeleteConversation}
+          />
+          
+          {/* Modal */}
+          <motion.div
+            initial={{ opacity: 0, scale: 0.9, y: 20 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.9, y: 20 }}
+            transition={{ type: "spring", stiffness: 400, damping: 25 }}
+            className="fixed inset-0 flex items-center justify-center z-50 p-4"
+          >
+            <div className={cn(
+              "w-full max-w-md rounded-2xl shadow-2xl border p-6",
+              isDarkMode
+                ? "bg-slate-800 border-slate-700"
+                : "bg-white border-gray-200"
+            )}>
+              <div className="flex items-center space-x-3 mb-4">
+                <div className={cn(
+                  "w-10 h-10 rounded-full flex items-center justify-center",
+                  isDarkMode ? "bg-red-500/20" : "bg-red-500/10"
+                )}>
+                  <Trash2 className={cn(
+                    "w-5 h-5",
+                    isDarkMode ? "text-red-400" : "text-red-600"
+                  )} />
+                </div>
+                <div>
+                  <h4 className={cn(
+                    "text-lg font-semibold",
+                    isDarkMode ? "text-slate-100" : "text-gray-900"
+                  )}>
+                    Supprimer la conversation 
+                  </h4>
+                  <p className={cn(
+                    "text-sm",
+                    isDarkMode ? "text-slate-400" : "text-gray-600"
+                  )}>
+                    Cette action est irréversible
+                  </p>
+                </div>
+              </div>
+              
+              <p className={cn(
+                "text-sm mb-6",
+                isDarkMode ? "text-slate-300" : "text-gray-700"
+              )}>
+                Êtes-vous sûr de vouloir supprimer cette conversation ? Tous les messages seront définitivement perdus.
+              </p>
+              
+              <div className="flex space-x-3">
+                <button
+                  onClick={cancelDeleteConversation}
+                  className="flex-1 px-4 py-2 rounded-lg font-medium text-sm transition-all duration-200 bg-white border border-gray-300 text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-gray-200"
+                  style={{ 
+                    backgroundColor: 'white !important', 
+                    borderColor: '#d1d5db !important', 
+                    color: '#374151 !important',
+                    boxShadow: 'none'
+                  }}
+                >
+                  Annuler
+                </button>
+                <button
+                  onClick={confirmDeleteConversation}
+                  className="flex-1 px-4 py-2 rounded-lg font-medium text-sm transition-all duration-200 bg-red-600 hover:bg-red-700 text-white focus:outline-none focus:ring-2 focus:ring-red-200"
+                  style={{ 
+                    backgroundColor: '#dc2626 !important', 
+                    color: 'white !important', 
+                    border: 'none !important',
+                    boxShadow: 'none'
+                  }}
+                >
+                  Supprimer
+                </button>
+              </div>
+            </div>
+          </motion.div>
+        </>
+      )}
+    </AnimatePresence>
+  );
+} 

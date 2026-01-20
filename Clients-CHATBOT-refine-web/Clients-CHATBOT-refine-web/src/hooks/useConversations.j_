@@ -1,0 +1,155 @@
+'use client';
+
+import { useState, useEffect, useCallback } from 'react';
+import { useRouter } from 'next/navigation';
+import { MessageUtils } from '../lib/utils/messageUtils';
+import { ConversationUtils } from '../lib/utils/conversationUtils';
+import { useConversationsContext } from '../contexts/ConversationsContext';
+
+export const useConversations = () => {
+  // Get shared state from context
+  const {
+    conversations: allConversations,
+    isLoading,
+    error,
+    createNewConversation,
+    deleteConversation,
+    saveEdit: contextSaveEdit
+  } = useConversationsContext();
+
+  // Local UI-specific state
+  const [filteredConversations, setFilteredConversations] = useState([]);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [isCreating, setIsCreating] = useState(false);
+  const [editingId, setEditingId] = useState(null);
+  const [editTitle, setEditTitle] = useState('');
+  const [openDropdown, setOpenDropdown] = useState(null);
+  const router = useRouter();
+
+  // Filter conversations based on search term
+  useEffect(() => {
+    if (!searchTerm.trim()) {
+      setFilteredConversations(allConversations);
+    } else {
+      const filtered = allConversations.filter(conv =>
+        conv.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (conv.messages && conv.messages.some(msg => 
+          msg.content.toLowerCase().includes(searchTerm.toLowerCase())
+        ))
+      );
+      setFilteredConversations(filtered);
+    }
+  }, [allConversations, searchTerm]);
+
+  const handleCreateNewConversation = useCallback(async () => {
+    try {
+      setIsCreating(true);
+      await createNewConversation();
+    } catch (error) {
+      console.error('Failed to create conversation:', error);
+    } finally {
+      setIsCreating(false);
+    }
+  }, [createNewConversation]);
+
+  const handleDeleteConversation = useCallback(async (id) => {
+    try {
+      await deleteConversation(id);
+      setOpenDropdown(null);
+    } catch (error) {
+      console.error('Failed to delete conversation:', error);
+    }
+  }, [deleteConversation]);
+
+  const startEditing = useCallback((id, currentTitle) => {
+    setEditingId(id);
+    setEditTitle(currentTitle);
+    setOpenDropdown(null);
+  }, []);
+
+  const saveEdit = useCallback(async (id) => {
+    if (!editTitle.trim()) return;
+
+    try {
+      await contextSaveEdit(id, editTitle.trim());
+      setEditingId(null);
+      setEditTitle('');
+    } catch (error) {
+      console.error('Failed to update conversation title:', error);
+    }
+  }, [editTitle, contextSaveEdit]);
+
+  const cancelEdit = useCallback(() => {
+    setEditingId(null);
+    setEditTitle('');
+  }, []);
+
+  const openConversation = useCallback((id) => {
+    router.push(`/dashboard?conversation=${id}`);
+  }, [router]);
+
+  const toggleDropdown = useCallback((id) => {
+    setOpenDropdown(openDropdown === id ? null : id);
+  }, [openDropdown]);
+
+  const closeDropdown = useCallback(() => {
+    setOpenDropdown(null);
+  }, []);
+
+  const exportConversations = useCallback(() => {
+    try {
+      ConversationUtils.exportConversations();
+    } catch (error) {
+      console.error('Failed to export conversations:', error);
+    }
+  }, []);
+
+  const getConversationPreview = useCallback((conversation) => {
+    if (!conversation.messages || conversation.messages.length === 0) {
+      return 'Aucun message';
+    }
+    
+    const lastMessage = conversation.messages[conversation.messages.length - 1];
+    return lastMessage.content.length > 100 
+      ? lastMessage.content.substring(0, 100) + '...'
+      : lastMessage.content;
+  }, []);
+
+  const formatDate = useCallback((dateString) => {
+    return MessageUtils.formatConversationDate(dateString, 'useConversations');
+  }, []);
+
+  const getLastMessageDate = useCallback((conversation) => {
+    return MessageUtils.getLastMessageTimestamp(conversation);
+  }, []);
+
+  return {
+    // State (filtered conversations instead of raw conversations)
+    conversations: filteredConversations,
+    searchTerm,
+    isLoading,
+    isCreating,
+    editingId,
+    editTitle,
+    openDropdown,
+    error,
+
+    // Actions
+    setSearchTerm,
+    setEditTitle,
+    createNewConversation: handleCreateNewConversation,
+    deleteConversation: handleDeleteConversation,
+    startEditing,
+    saveEdit,
+    cancelEdit,
+    openConversation,
+    toggleDropdown,
+    closeDropdown,
+    exportConversations,
+    
+    // Helpers
+    getConversationPreview,
+    formatDate,
+    getLastMessageDate
+  };
+}; 
